@@ -1,0 +1,1 @@
+{"name":"wx_private","platform":"weixin","account":"wx-example","chat_type":"direct","enabled":false,"require_mention":false,"target":{"kind":"script","name":"wx_reply"},"inputs":{},"max_concurrent_runs":1,"identity_mode":"required"}

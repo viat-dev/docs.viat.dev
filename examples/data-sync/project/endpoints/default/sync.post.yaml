@@ -1,0 +1,10 @@
+method: POST
+target: {kind: workflow, ref: sync}
+allowed_authorizers: [case_machine]
+authz_gates: []
+override_authorizers: true
+override_permissions: false
+overrides:
+  strict: true
+  body_fields:
+    batch_size: {type: int, default: 2}

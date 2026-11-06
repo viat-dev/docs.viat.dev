@@ -1,0 +1,27 @@
+---
+import MarkdownContent from '@astrojs/starlight/components/MarkdownContent.astro';
+import manifest from '../../contracts/manifest.json';
+import { withBase } from '../../scripts/lib/site.mjs';
+const { entry, locale } = Astro.locals.starlightRoute;
+const chinese = locale === 'zh-cn';
+const raw = withBase(`/markdown/${entry.id.replace(/\.md$/, '')}.md`);
+const example = entry.data.doc_id?.startsWith('applications.') ? entry.data.doc_id.slice('applications.'.length) : null;
+---
+{entry.data.doc_id && <aside aria-label={chinese ? '文档版本' : 'Documentation version'}>
+  <p>
+    {chinese ? '核验版本' : 'Verified release'}: {entry.data.verified_release}
+    · {entry.data.channel === 'preview' ? (chinese ? '未发布功能预览' : 'Unreleased feature preview') : (chinese ? '已发布能力参考' : 'Released capability reference')}
+    · <a href={raw}>{chinese ? '原始 Markdown' : 'Raw Markdown'}</a>
+    {example && <> · <a href={withBase(`/examples/${example}/`)}>{chinese ? '完整示例文件' : 'Complete example files'}</a></>}
+  </p>
+  {!manifest.publication_ready && <p>
+    {chinese
+      ? '文档重建预览：当前页面已编写，但全站覆盖与示例验收仍在进行，不代表完整文档已发布。'
+      : 'Handbook reconstruction preview: this page is authored, but full coverage and example acceptance are still in progress. This is not a complete documentation release.'}
+  </p>}
+</aside>}
+<MarkdownContent><slot /></MarkdownContent>
+<style>
+  aside { border-inline-start: 3px solid var(--sl-color-gray-4); padding-inline-start: 1rem; margin-block-end: 1.5rem; color: var(--sl-color-gray-2); font-size: var(--sl-text-sm); }
+  aside p + p { margin-block-start: 0.5rem; }
+</style>

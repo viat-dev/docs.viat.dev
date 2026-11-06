@@ -1,0 +1,9 @@
+name: sync-hourly
+trigger: {kind: interval, every_secs: 3600}
+target: {kind: workflow, name: sync}
+inputs: {batch_size: 2}
+enabled: false
+on_overlap: skip
+max_attempts: 1
+retry_backoff_secs: 60
+catch_up: false

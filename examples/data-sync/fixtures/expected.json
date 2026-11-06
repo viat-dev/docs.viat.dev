@@ -1,0 +1,12 @@
+{
+  "pages": [
+    {"cursor_before": 0, "cursor": 2, "read": 2, "more": true},
+    {"cursor_before": 2, "cursor": 4, "read": 2, "more": false},
+    {"cursor_before": 4, "cursor": 4, "read": 0, "more": false}
+  ],
+  "items": [
+    {"item_id": "A", "value": "alpha-v2", "source_seq": 3, "deleted": 0},
+    {"item_id": "B", "value": "", "source_seq": 4, "deleted": 1}
+  ],
+  "invalid_input": "invalid_batch_size"
+}

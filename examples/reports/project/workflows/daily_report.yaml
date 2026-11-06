@@ -1,0 +1,21 @@
+inputs:
+  start_date: {type: string, default: ''}
+  end_date: {type: string, default: ''}
+  send: {type: boolean, default: false}
+steps:
+  - id: build
+    script: build_report
+    args:
+      start_date: $inputs.start_date
+      end_date: $inputs.end_date
+    on_error: fail
+  - id: notify
+    script: notify_report
+    args:
+      report_id: $build.output.report_id
+      send: $inputs.send
+    on_error: fail
+outputs:
+  report: $build.output
+  notification: $notify.output
+timeout: 45

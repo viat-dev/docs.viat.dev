@@ -1,0 +1,1 @@
+{"name":"pd_model","kind":"llm","plain":{"provider":"custom","endpoint":"https://model.example.test/v1","model":"fixture-model","extra_params":{}},"secret":{"api_key":"synthetic-not-a-provider-key"}}

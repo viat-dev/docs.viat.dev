@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "contract_source": "03751a679ed0205505ab9fae5207a66189c47a18",
+  "source_dirty": true,
+  "handbook_sha256": "0639540bcc346da65a94221fb0a8252b174b4b848688a7f99140dfec86793e3d",
+  "normalization_note": "Terminal blank lines normalized for initial source publication; content checks rerun. Evidence scopes and partial statuses are unchanged.",
+  "examples_sha256": "d749275b5ba32ea3df112e0ccabf8f3532052b7411a3bfb28d02af90067d9f63",
+  "checks": [
+    {
+      "id": "cli-examples",
+      "status": "passed",
+      "command": "collect:cli; DOC_CONTRACT_EXAMPLES=<collected tokens> cargo nextest run --workspace --no-fail-fast -j 8 --retries 0 -E test(doc_contract_export)",
+      "evidence_sha256": "be2d7c978b87de87b71ed1d71839b189f08812a339851b941bc23bf82d3c169d",
+      "scope": "385 distinct collected fenced/explicit token fixtures; argument parsing only, not dispatch, shell effects or every inline command fragment"
+    },
+    {
+      "id": "mcp-integration",
+      "status": "passed",
+      "command": "cargo nextest run --workspace --no-fail-fast -j 8 --retries 0 -E test(stdio_smoke)",
+      "evidence_sha256": "be2d7c978b87de87b71ed1d71839b189f08812a339851b941bc23bf82d3c169d",
+      "scope": "Actual stdio initialization, 46-tool inventory and success/error result framing; not all handbook tool requests or provider effects"
+    },
+    {
+      "id": "offline-book",
+      "status": "passed",
+      "command": "npm run build:book",
+      "evidence_sha256": "53a8e9f530b27fad6b2b33a010a0f920ee9d8c450e8eed1510fbb5a3be7dc969",
+      "scope": "401 offline HTML pages, example sources, local links/assets under /_docs/ and /viat/_docs/; browser interaction and product sync are separate"
+    },
+    {
+      "id": "application-examples",
+      "status": "partial",
+      "command": "npm run validate:examples; explicit handbook_examples nextest acceptance",
+      "evidence_sha256": "61b97870f9b61a5a97bff07a9066fcb7f700fa36a5681300e8679c1d90b0a1b8",
+      "unit_evidence_sha256": "41000dec6e1a2a5c3bd9782e509b957b28ac872a76709f648aaa8b7e87f2dce6",
+      "scope": "All eight offline validators passed; first endpoint and CMS real-stack acceptance passed; six workflows parsed/validated by runtime. Other real broker/provider/device workflows remain unverified"
+    },
+    {
+      "id": "resource-examples",
+      "status": "partial",
+      "scope": "Structural contracts and source-reviewed references complete; not all 20 per-kind examples exercised against actual backends"
+    },
+    {
+      "id": "bilingual-review",
+      "status": "partial",
+      "scope": "310/310 required IDs in each locale, metadata/link/snippet parity passed; comprehensive semantic review remains separate"
+    },
+    {
+      "id": "product-doc-pins",
+      "status": "partial",
+      "command": "cargo nextest run --workspace --no-fail-fast -j 8 --retries 0",
+      "evidence_sha256": "f931fdcc9ef570248cafc00f29f7a335b624d7aead6b2ad48a3db33ac28fb2e4",
+      "scope": "3486 passed, 6 ignored in current source workspace; strengthened existing doc pins pass. New offline export is not yet synchronized into the product release book"
+    },
+    {
+      "id": "public-output-privacy",
+      "status": "partial",
+      "command": "npm run build",
+      "evidence_sha256": "01963f8008b91b32fc5ef3b3ef52424f508fb9f2060ebdb88d364958cfa2fdcd",
+      "scope": "Allowlisted output and automated credential/private-path scans passed; final manual public-output review not recorded"
+    }
+  ],
+  "review": {
+    "target": "examples",
+    "level": "high",
+    "findings": 6,
+    "fixed": 5,
+    "retained_with_rationale": "Per-row CMS authorization is retained to honor later object-dependent policy changes; its bounded RPC cost and whole-list refusal behavior are documented. A subject-only shortcut would change authorization semantics."
+  },
+  "remaining": [
+    "Clean reviewed product/documentation commits and matching contract provenance",
+    "Remaining broker/provider/device acceptance, only with approved isolated infrastructure",
+    "Browser search and language-switch verification",
+    "Product offline-book synchronization and legacy-path compatibility",
+    "Final semantic/public-output review",
+    "Explicit authorization for pushes, hosting, DNS and production deployment"
+  ]
+}

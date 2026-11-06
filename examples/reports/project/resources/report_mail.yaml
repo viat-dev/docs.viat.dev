@@ -1,0 +1,12 @@
+name: report_mail
+kind: smtp
+plain:
+  host: 127.0.0.1
+  port: 2525
+  tls: none
+  from_address: sender@example.test
+  from_name: Isolated report fixture
+secret:
+  username: ''
+  password: ''
+allowed_authorizers: []

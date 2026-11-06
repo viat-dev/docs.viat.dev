@@ -1,0 +1,9 @@
+name: webhook_key
+kind: crypto_key
+plain:
+  algorithm: hmac
+  key_encoding: utf8
+  key_id: documentation-only
+secret:
+  key: documentation-fixture-key-not-for-production
+allowed_authorizers: []

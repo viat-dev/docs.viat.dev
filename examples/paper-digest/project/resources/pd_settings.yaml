@@ -1,0 +1,17 @@
+{
+  "name": "pd_settings",
+  "kind": "config",
+  "plain": {"data": {
+    "source_mode": "fixture", "network_enabled": false,
+    "model_mode": "fixture", "paid_calls_enabled": false,
+    "durable_enabled": false, "delivery_enabled": false,
+    "fixture_feed": "<rss version=\"2.0\"><channel><title>Synthetic papers</title><item><title>Example cache study</title><link>https://papers.example.test/cache#abstract</link><description>A synthetic experiment compares two cache policies. This is not a real publication.</description></item><item><title>Example cache study</title><link>https://papers.example.test/cache</link><description>A synthetic experiment compares two cache policies. This is not a real publication.</description></item></channel></rss>",
+    "fixture_summaries": {
+      "https://papers.example.test/cache": {
+        "summary": "Synthetic abstract: two cache policies are compared; no real-world conclusion is established.",
+        "citations": ["https://papers.example.test/cache"]
+      }
+    }
+  }},
+  "secret": {}
+}

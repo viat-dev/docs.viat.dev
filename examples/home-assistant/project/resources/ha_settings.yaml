@@ -1,0 +1,12 @@
+{
+  "name":"ha_settings","kind":"config",
+  "plain":{"data":{
+    "http_authorizers":["password"],
+    "read_user_ids":[],"execute_user_ids":[],
+    "read_mode":"fixture","read_network_enabled":false,"real_actions_enabled":false,
+    "fixture_states":{
+      "sensor.example_temperature":{"entity_id":"sensor.example_temperature","state":"21.5","attributes":{"unit_of_measurement":"°C"}},
+      "light.example_desk":{"entity_id":"light.example_desk","state":"off","attributes":{"brightness":0}}
+    }
+  }},"secret":{}
+}

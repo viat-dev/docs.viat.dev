@@ -1,0 +1,1 @@
+{"name":"pd_daily","trigger":{"kind":"cron","cron":"0 8 * * *","timezone":"UTC"},"target":{"kind":"workflow","name":"pd_daily"},"inputs":{},"enabled":false,"on_overlap":"skip","max_attempts":1,"catch_up":false}

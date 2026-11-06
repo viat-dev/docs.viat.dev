@@ -1,0 +1,15 @@
+{
+  "name": "adapter",
+  "kind": "http_api",
+  "plain": {
+    "base_url": "https://adapter.example.invalid",
+    "auth_type": "bearer",
+    "custom_headers": {
+      "Accept": "application/json"
+    }
+  },
+  "secret": {
+    "token": "local-synthetic-adapter-only"
+  },
+  "allowed_authorizers": []
+}

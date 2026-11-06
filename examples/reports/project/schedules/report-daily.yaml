@@ -1,0 +1,9 @@
+name: report-daily
+trigger: {kind: cron, cron: '5 0 * * *', timezone: UTC}
+target: {kind: workflow, name: daily_report}
+inputs: {start_date: '', end_date: '', send: false}
+enabled: false
+on_overlap: skip
+max_attempts: 1
+retry_backoff_secs: 60
+catch_up: false

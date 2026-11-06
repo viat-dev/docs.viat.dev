@@ -1,0 +1,1 @@
+{"method":"POST","target":{"kind":"workflow","ref":"pd_daily"},"allowed_authorizers":[],"authz_gates":[],"override_authorizers":true,"override_permissions":false,"overrides":{"strict":true,"body_fields":{},"query_params":{}}}

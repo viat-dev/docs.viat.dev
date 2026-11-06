@@ -1,0 +1,1 @@
+{"inputs":{"message":{"type":"object","default":null}},"steps":[{"id":"reply","script":"wx_reply","args":{"message":"$inputs.message"}}],"outputs":{"reply":"$reply.output"},"timeout":10}

@@ -1,0 +1,1 @@
+{"inputs":{"entity":{"type":"string","default":"sensor.example_temperature"}},"steps":[{"id":"state","script":"ha_read","args":{"entity":"$inputs.entity"}}],"outputs":{"state":"$state.output"},"timeout":20}

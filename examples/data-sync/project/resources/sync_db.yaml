@@ -1,0 +1,8 @@
+name: sync_db
+kind: sqlite
+plain:
+  path: /approved-example-root/data-sync.sqlite
+  read_only: false
+  create_if_missing: false
+secret: {}
+allowed_authorizers: []

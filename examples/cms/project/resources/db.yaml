@@ -1,0 +1,15 @@
+{
+  "name": "db",
+  "kind": "postgresql",
+  "plain": {
+    "host": "postgres.example.invalid",
+    "port": 5432,
+    "database": "cms_example",
+    "ssl": false
+  },
+  "secret": {
+    "user": "cms_example",
+    "password": "local-fixture-only-not-for-production"
+  },
+  "allowed_authorizers": []
+}

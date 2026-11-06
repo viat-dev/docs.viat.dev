@@ -1,0 +1,75 @@
+name: Documentation checks and Pages
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Read existing Pages URL
+        id: pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: false
+      - run: npm ci
+      # Publishing this explicitly labeled candidate does not waive release
+      # acceptance. Keep the warning/noindex and publication_ready=false.
+      - name: Build and validate candidate
+        env:
+          DOCS_SITE: ${{ steps.pages.outputs.origin }}
+          DOCS_BASE: ${{ steps.pages.outputs.base_path || '/' }}
+        run: |
+          npm run build
+          npm run validate:examples
+          npm run export:book
+          node scripts/check-content.mjs --inventory
+      - name: Upload PR preview
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: handbook-preview
+          path: dist
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy labeled candidate to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

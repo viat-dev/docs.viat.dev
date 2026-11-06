@@ -1,0 +1,88 @@
+{
+  "count": 9,
+  "languages": [
+    {
+      "binds_refs_as_identifiers": false,
+      "compiles_to_artifact": false,
+      "name": "binary",
+      "runs_from_artifact": true,
+      "runs_in_worker_pool": false,
+      "supports_uses_imports": false
+    },
+    {
+      "binds_refs_as_identifiers": false,
+      "compiles_to_artifact": false,
+      "name": "graphql",
+      "runs_from_artifact": false,
+      "runs_in_worker_pool": false,
+      "supports_uses_imports": false
+    },
+    {
+      "binds_refs_as_identifiers": false,
+      "compiles_to_artifact": false,
+      "name": "llm",
+      "runs_from_artifact": false,
+      "runs_in_worker_pool": false,
+      "supports_uses_imports": false
+    },
+    {
+      "binds_refs_as_identifiers": true,
+      "compiles_to_artifact": false,
+      "name": "python",
+      "runs_from_artifact": false,
+      "runs_in_worker_pool": true,
+      "supports_uses_imports": true
+    },
+    {
+      "binds_refs_as_identifiers": false,
+      "compiles_to_artifact": true,
+      "name": "rust",
+      "runs_from_artifact": true,
+      "runs_in_worker_pool": false,
+      "supports_uses_imports": false
+    },
+    {
+      "binds_refs_as_identifiers": true,
+      "compiles_to_artifact": false,
+      "name": "shell",
+      "runs_from_artifact": false,
+      "runs_in_worker_pool": false,
+      "supports_uses_imports": false
+    },
+    {
+      "binds_refs_as_identifiers": false,
+      "compiles_to_artifact": false,
+      "name": "sql",
+      "runs_from_artifact": false,
+      "runs_in_worker_pool": false,
+      "supports_uses_imports": false
+    },
+    {
+      "binds_refs_as_identifiers": true,
+      "compiles_to_artifact": false,
+      "name": "typescript",
+      "runs_from_artifact": false,
+      "runs_in_worker_pool": true,
+      "supports_uses_imports": true
+    },
+    {
+      "binds_refs_as_identifiers": false,
+      "compiles_to_artifact": false,
+      "name": "viat_gql",
+      "runs_from_artifact": false,
+      "runs_in_worker_pool": false,
+      "supports_uses_imports": false
+    }
+  ],
+  "schema_version": 1,
+  "source": {
+    "dirty": true,
+    "paths": [
+      "crates/viat-core/src/doc_contracts.rs",
+      "crates/viat-core/src/types/script.rs",
+      "scripts/doc-contract-support.rs",
+      "scripts/doc-enum-inventory.rs"
+    ],
+    "sha": "03751a679ed0205505ab9fae5207a66189c47a18"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "read":{"entity":"sensor.example_temperature"},
+  "action":{"action":"light.turn_on","entity":"light.example_desk","data":{"brightness":64},"confirm":true},
+  "unsafe":[
+    {"action":"lock.unlock","entity":"lock.front_door","data":{},"confirm":true},
+    {"action":"light.turn_on","entity":"light.example_desk","data":{"entity_id":"all"},"confirm":true},
+    {"action":"light.turn_on","entity":"light.example_desk","data":{"brightness":true},"confirm":true},
+    {"action":"light.turn_on","entity":"../services/script/run","data":{},"confirm":true},
+    {"action":"light.turn_off","entity":"light.example_desk","data":{"brightness":64},"confirm":true}
+  ]
+}

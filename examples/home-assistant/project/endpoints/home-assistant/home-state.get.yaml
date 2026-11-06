@@ -1,0 +1,1 @@
+{"method":"GET","target":{"kind":"script","ref":"ha_read"},"allowed_authorizers":[],"authz_gates":[],"override_authorizers":true,"override_permissions":false,"overrides":{"strict":true,"query_params":{"entity":{"type":"string","default":"sensor.example_temperature"}},"body_fields":{}}}

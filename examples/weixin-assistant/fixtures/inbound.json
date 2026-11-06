@@ -1,0 +1,8 @@
+{
+  "platform":"weixin",
+  "account":{"id":"synthetic-account-not-a-binding","name":"wx-example","meta":{}},
+  "chat_type":"direct","chat_id":"synthetic-peer","sender_id":"synthetic-sender",
+  "kind":"text","text":"/help","mentioned":false,
+  "identity":null,"reply_handle":null,
+  "raw":{"message_type":1,"message_state":2,"from_user_id":"synthetic-sender","message_id":"synthetic-message","item_list":[{"type":1,"text_item":{"text":"/help"}}]}
+}

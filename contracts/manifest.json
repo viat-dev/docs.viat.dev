@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "edition": "1.1.0",
+  "default_locale": "zh-cn",
+  "locales": [
+    "zh-cn",
+    "en"
+  ],
+  "publication_ready": false,
+  "server": {
+    "version": "1.1.0",
+    "release_source": "fd340879076a87c2662c454788178eecb05d0036",
+    "inspected_main": "03751a679ed0205505ab9fae5207a66189c47a18"
+  },
+  "client": {
+    "version": "0.1.0",
+    "versioned_independently": true,
+    "public_download_channel": null
+  },
+  "preview_features": [
+    {
+      "id": "widget.apns-snapshots",
+      "source": "b3c3ae9b4ff80c6193cdd4291578ef5b08174b47",
+      "released": false
+    }
+  ],
+  "contract_bundle": {
+    "directory": "contracts/1.1.0",
+    "source_sha": "03751a679ed0205505ab9fae5207a66189c47a18",
+    "source_dirty": true,
+    "review_status": "candidate",
+    "files": {
+      "resources.json": {
+        "sha256": "940753c514722d1ed864bf48ce8eceac3de23f01c342fc742b98f9fa767d3d93"
+      },
+      "languages.json": {
+        "sha256": "9ac01e61726c4354db7728f98b6ef459f2d0978425885dcc3614c501cd5bc4cb"
+      },
+      "cli.json": {
+        "sha256": "f182af60db16d0028889978a38086b5fd1064089abcd95b38d16cd439266b72a"
+      },
+      "mcp-tools.json": {
+        "sha256": "c75aa1deb0eb4bfaa7a83b086787b125ba32bdffb40ad15ed1097e8a16a72c7a"
+      }
+    }
+  },
+  "publication_notes": [
+    "Documentation reconstruction is in progress; local preview is not a complete release.",
+    "Chinese and English references and examples must pass the same coverage gates.",
+    "Activation-code acquisition and client public download channels are not invented."
+  ]
+}

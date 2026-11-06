@@ -1,0 +1,18 @@
+[
+  {
+    "identity": "cms-reader",
+    "role": "reader"
+  },
+  {
+    "identity": "cms-author-a",
+    "role": "author"
+  },
+  {
+    "identity": "cms-author-b",
+    "role": "author"
+  },
+  {
+    "identity": "cms-editor",
+    "role": "editor"
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "report": {
+    "report_id": "daily-v1:2026-11-03:2026-11-04",
+    "text": "Daily sales (UTC) [2026-11-03, 2026-11-04)\nCNY orders=1 total_cents=800\nUSD orders=2 total_cents=2000\n",
+    "rows": [
+      {"currency": "CNY", "orders": 1, "total_cents": 800},
+      {"currency": "USD", "orders": 2, "total_cents": 2000}
+    ]
+  },
+  "notification": {"state": "disabled", "attempted": false}
+}

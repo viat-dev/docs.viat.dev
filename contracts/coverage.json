@@ -1,0 +1,25 @@
+{
+  "required_documents": [
+    "handbook.index", "overview.platform", "overview.concepts", "overview.capabilities",
+    "getting-started.first-endpoint", "installation.docker-compose", "installation.binary-source", "installation.clients",
+    "instance.activation", "instance.platform-users", "instance.settings",
+    "projects.create-and-collaborate", "projects.settings", "projects.repo-sync",
+    "configuration.overview", "configuration.database", "configuration.security", "configuration.runtime", "configuration.network", "configuration.storage", "configuration.observability", "configuration.integrations",
+    "auth.management", "auth.endpoints", "auth.authorizers", "auth.authorization", "auth.pats", "auth.mfa", "auth.platform-apps",
+    "resources.overview", "script.context", "script.annotations", "script.dependencies", "script.async-tasks", "script.worker-protocol",
+    "workflow.overview", "workflow.expressions", "workflow.error-handling", "workflow.limits",
+    "workflow.step.script", "workflow.step.if", "workflow.step.parallel", "workflow.step.for_each", "workflow.step.while", "workflow.step.until", "workflow.step.workflow",
+    "triggers.http", "triggers.crud", "triggers.websocket-endpoints", "triggers.schedules", "triggers.watches", "triggers.wecom", "triggers.weixin", "triggers.feishu", "triggers.lark", "triggers.dingtalk", "triggers.queues", "triggers.websocket-subscriptions",
+    "testing.saved-cases", "testing.endpoint-tests", "testing.fixtures", "publishing.snapshots", "publishing.rollback", "publishing.promotion",
+    "operations.runs", "operations.logs", "operations.alerts", "operations.audit", "operations.retention", "operations.capacity", "operations.backup-restore", "operations.security", "operations.tls-proxy", "operations.upgrades", "operations.troubleshooting",
+    "cli.overview", "mcp.overview", "api.overview", "clients.mobile", "clients.widgets",
+    "applications.paper-digest", "applications.home-assistant", "applications.weixin-assistant", "applications.cms", "applications.lab-jobs", "applications.webhook-ingestion", "applications.data-sync", "applications.reports",
+    "reference.versions", "reference.errors", "reference.glossary"
+  ],
+  "inventory_rules": {
+    "resources": "One complete paired reference per exported resource kind.",
+    "languages": "One complete paired reference per exported script language.",
+    "cli": "Every canonical leaf must have a paired reference section; aliases are documented without double-counting.",
+    "mcp": "Every registered tool must have a paired reference with input, actual output, errors, permissions and side effects."
+  }
+}

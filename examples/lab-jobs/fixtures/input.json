@@ -1,0 +1,8 @@
+{
+  "op": "submit",
+  "job_id": "fixture-job",
+  "payload": {
+    "task": "synthetic"
+  },
+  "opt_in": false
+}

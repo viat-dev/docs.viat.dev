@@ -1,0 +1,1 @@
+{"name":"pd_delivery","kind":"http_api","plain":{"base_url":"https://delivery.example.test","auth_type":"none"},"secret":{}}
