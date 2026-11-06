@@ -1,0 +1,7 @@
+{
+  "inputs": {},
+  "steps": [{"id":"digest","script":"pd_run","args":{}}],
+  "outputs": {"digest":"$digest.output"},
+  "timeout": 120,
+  "max_concurrent": 1
+}

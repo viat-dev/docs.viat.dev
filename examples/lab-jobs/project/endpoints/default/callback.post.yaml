@@ -1,0 +1,38 @@
+{
+  "method": "POST",
+  "target": {
+    "kind": "script",
+    "ref": "jobs"
+  },
+  "allowed_authorizers": [
+    "callback-keys"
+  ],
+  "authz_gates": [],
+  "override_authorizers": true,
+  "override_permissions": true,
+  "overrides": {
+    "strict": true,
+    "body_fields": {
+      "op": {
+        "type": "string",
+        "required": true
+      },
+      "job_id": {
+        "type": "string",
+        "required": true
+      },
+      "payload": {
+        "type": "json",
+        "default": {}
+      },
+      "event": {
+        "type": "json",
+        "default": {}
+      },
+      "opt_in": {
+        "type": "bool",
+        "default": false
+      }
+    }
+  }
+}

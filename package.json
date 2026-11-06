@@ -1,0 +1,27 @@
+{
+  "name": "viat-product-handbook",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "npm run check && astro build && node scripts/export-markdown.mjs && node scripts/export-examples.mjs && node scripts/check-output.mjs",
+    "preview": "astro preview",
+    "check": "node scripts/check-content.mjs && node --test tests/*.test.mjs",
+    "check:release": "node scripts/check-content.mjs --release && npm run validate:examples && npm run build",
+    "export:book": "node scripts/export-mdbook.mjs",
+    "validate:examples": "python3 -I -B examples/hello-endpoint/validate.py && node scripts/validate-applications.mjs",
+    "build:book": "npm run export:book && mdbook build exports/mdbook && node scripts/export-examples.mjs --book && node scripts/check-book.mjs",
+    "collect:cli": "node scripts/collect-cli-examples.mjs"
+  },
+  "engines": {
+    "node": ">=22.23.4"
+  },
+  "dependencies": {
+    "@astrojs/markdown-remark": "7.3.0",
+    "@astrojs/starlight": "0.42.9",
+    "astro": "7.4.7",
+    "gray-matter": "4.0.3",
+    "unist-util-visit": "5.0.0"
+  }
+}

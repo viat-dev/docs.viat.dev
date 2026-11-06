@@ -1,0 +1,16 @@
+{
+  "method": "POST",
+  "target": {"kind": "workflow", "ref": "submit_job"},
+  "allowed_authorizers": ["lab-keys"],
+  "authz_gates": [],
+  "override_authorizers": true,
+  "override_permissions": true,
+  "overrides": {
+    "strict": true,
+    "body_fields": {
+      "job_id": {"type": "string", "required": true},
+      "payload": {"type": "json", "default": {"task": "synthetic"}},
+      "opt_in": {"type": "bool", "default": false}
+    }
+  }
+}

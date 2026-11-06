@@ -1,0 +1,1721 @@
+{
+  "count": 46,
+  "schema_version": 1,
+  "source": {
+    "dirty": true,
+    "paths": [
+      "crates/viat-mcp/src/tools/alerts.rs",
+      "crates/viat-mcp/src/tools/audit.rs",
+      "crates/viat-mcp/src/tools/call.rs",
+      "crates/viat-mcp/src/tools/doc_contracts.rs",
+      "crates/viat-mcp/src/tools/endpoints.rs",
+      "crates/viat-mcp/src/tools/executions.rs",
+      "crates/viat-mcp/src/tools/files.rs",
+      "crates/viat-mcp/src/tools/projects.rs",
+      "crates/viat-mcp/src/tools/publish.rs",
+      "crates/viat-mcp/src/tools/queue.rs",
+      "crates/viat-mcp/src/tools/resources.rs",
+      "crates/viat-mcp/src/tools/schedules.rs",
+      "crates/viat-mcp/src/tools/scripts.rs",
+      "crates/viat-mcp/src/tools/service.rs",
+      "crates/viat-mcp/src/tools/workflows.rs",
+      "scripts/doc-contract-support.rs"
+    ],
+    "sha": "03751a679ed0205505ab9fae5207a66189c47a18"
+  },
+  "tools": [
+    {
+      "description": "Invoke a project endpoint through the viat-api project router (/p/{slug}/...). Returns status, headers, body, and a truncated flag (body capped at 1 MiB).",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "body": {
+            "description": "Optional JSON request body."
+          },
+          "headers": {
+            "additionalProperties": true,
+            "description": "Optional request headers.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "method": {
+            "description": "HTTP method (GET, POST, PUT, DELETE, PATCH, ...).",
+            "type": "string"
+          },
+          "path": {
+            "description": "Endpoint path within the project, e.g. \"/users/123\". Must start with '/'.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timeout_ms": {
+            "description": "Request timeout in milliseconds (default 10000, capped at 60000).",
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "method",
+          "path"
+        ],
+        "type": "object"
+      },
+      "name": "call_endpoint"
+    },
+    {
+      "description": "Create an endpoint node: a leaf with exactly ONE binding — script_name, workflow_name, proxy_resource_name (+proxy_strip_prefix/proxy_upstreams), crud_resource_name (+crud_config), or ws_config — or, with NO binding and NO method, a directory node other nodes hang under (build /api/users as directory 'api' + child 'users'). `tree` takes a tree NAME and is required once the project has several trees. Editor-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "allowed_authorizers": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "authz_gates": {
+            "description": "Authz-model gates (`[{type, action}]`); absent = inherit.",
+            "items": true,
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "crud_config": true,
+          "crud_resource_name": {
+            "description": "Bind a table-CRUD leaf to a `postgresql` resource (needs\n`crud_config` + `method`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "method": {
+            "description": "HTTP method; required for script/workflow/crud leaves, absent for\ndirectories and proxy mounts.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "override_authorizers": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "overrides": true,
+          "parent_id": {
+            "description": "Parent node id; omit to create at the tree root.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path_override": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "proxy_resource_name": {
+            "description": "Bind a proxy mount to an `http_api` resource.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "proxy_strip_prefix": {
+            "description": "Strip the mount's own prefix before forwarding (default true).",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "proxy_upstreams": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Per-path-param upstream overrides for the mount (value → resource).",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "script_name": {
+            "description": "Bind a script leaf.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "segment": {
+            "description": "Path segment (a literal like `users`, or a `:param` placeholder).",
+            "type": "string"
+          },
+          "tree": {
+            "description": "Tree NAME. Omitted works only while the project has exactly one\ntree (the server then picks it); required once there are several.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workflow_name": {
+            "description": "Bind a workflow leaf.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ws_config": {
+            "description": "Bind a websocket leaf (`{routes: {<route>: {script}}}`)."
+          }
+        },
+        "required": [
+          "segment"
+        ],
+        "type": "object"
+      },
+      "name": "create_endpoint"
+    },
+    {
+      "description": "Delete an alert rule by name. Publisher-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "name": {
+            "description": "Rule name.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "delete_alert"
+    },
+    {
+      "description": "Delete an endpoint node and its subtree (system nodes are refused). Editor-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "id": {
+            "description": "Endpoint node id.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "delete_endpoint"
+    },
+    {
+      "description": "Delete a schedule by name. Member-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "name": {
+            "description": "Schedule name.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "delete_schedule"
+    },
+    {
+      "description": "Delete a script (system scripts are refused). Endpoints bound to it go unknown-kind until rebound. Editor-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "folder": {
+            "description": "Folder path; omit for the project root.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Script name.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "delete_script"
+    },
+    {
+      "description": "Delete a workflow by name. Editor-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "folder": {
+            "description": "Folder path; omit for the project root.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Workflow name.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "delete_workflow"
+    },
+    {
+      "description": "Return a nested endpoint tree for the named tree in a project (resolves tree name to uuid; useful for understanding the URL hierarchy).",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tree": {
+            "description": "Tree name (e.g. \"main\"). viat-mcp resolves name → uuid.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tree"
+        ],
+        "type": "object"
+      },
+      "name": "get_endpoint_tree"
+    },
+    {
+      "description": "Read one project's settings: slug, name, registration/IdP flags, end-user MFA policy, default script timeout.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "get_project"
+    },
+    {
+      "description": "List the project's alert rules and their firing state (endpoint_errors / schedule_failures; webhook / chat / email / push channels). webhook_url shows redacted unless the caller is a publisher.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "list_alerts"
+    },
+    {
+      "description": "List endpoints in a project, optionally filtered by tree name. Returns id/method/path/segment/parent_id/tree_id/script_name/workflow_name/kind for each endpoint, and a websocket endpoint's routes (route -> script) as ws_routes. A websocket endpoint cannot be called with call_endpoint.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tree": {
+            "description": "Optional tree NAME (not UUID). viat-mcp resolves name → uuid.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "list_endpoints"
+    },
+    {
+      "description": "List the files a storage resource manages, newest first, with keyset pagination (next_cursor → before). Read-only: file writes go through scripts or the console.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "before": {
+            "description": "Keyset cursor from the prior page's `next_cursor`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "folder": {
+            "description": "Folder path, when the resource lives in a folder.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Page size.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "owner_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owner_type": {
+            "description": "Filter by the owning object (what `set_resource`/scripts recorded).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prefix": {
+            "description": "Only keys with this prefix.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resource": {
+            "description": "The `storage` resource whose files to list.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource"
+        ],
+        "type": "object"
+      },
+      "name": "list_files"
+    },
+    {
+      "description": "List the projects the configured token's user is a member of (not platform-wide). NOT reachable with a project-scoped PAT (its confinement rejects /projects) — configure VIAT_PROJECT instead.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object"
+      },
+      "name": "list_projects"
+    },
+    {
+      "description": "List the project's RabbitMQ consume triggers (resource, queue, concurrency, target, inputs). NOTE: this route is Editor-gated (Owner/Admin/Developer) even for reading — a plain member gets 403.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "list_queue_triggers"
+    },
+    {
+      "description": "List recent endpoint execution summaries for a project, with optional status/path/script filters and cursor pagination via next_before.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "before": {
+            "description": "Cursor for pagination from a prior `next_before`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Max items to return (default 20, capped at 200).",
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "path_eq": {
+            "description": "Filter by exact endpoint path.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "script": {
+            "description": "Filter by script name.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status_max": {
+            "description": "Max HTTP status to include (inclusive).",
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status_min": {
+            "description": "Min HTTP status to include (inclusive). E.g. 500 to see only errors.",
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "list_recent_runs"
+    },
+    {
+      "description": "List configured resources (datasources, llm/llm credentials, s3 buckets, etc.) for a project, with a best-effort locator (host/endpoint/bucket/base_url).",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "list_resources"
+    },
+    {
+      "description": "List a project's schedules with their echoed trigger (cron/interval/once), target, inputs, and overlap/retry policy.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "list_schedules"
+    },
+    {
+      "description": "List a project's scripts WITHOUT their code (name, folder, language, version, size in content_bytes) — a broad listing cannot flood your context. Fetch a single script's full source with read_script.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "list_scripts"
+    },
+    {
+      "description": "List a project's workflows (name, folder, version, bound endpoint count). The list carries no definition — read_workflow fetches one.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "list_workflows"
+    },
+    {
+      "description": "Move an endpoint node under a different parent (omit parent_id to reroot it in its current tree). Editor-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "id": {
+            "description": "Endpoint node id.",
+            "type": "string"
+          },
+          "parent_id": {
+            "description": "New parent node id; omit to reroot the node in its current tree.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "move_endpoint"
+    },
+    {
+      "description": "Stop a schedule from firing until resume_schedule. Member-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "name": {
+            "description": "Schedule name.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "pause_schedule"
+    },
+    {
+      "description": "Dry-run a cron expression against the SAME parser the scheduler uses — the preview cannot lie about what the scheduler will do. Returns the next fires and the timezone actually used.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "count": {
+            "description": "How many fires to list (default 5, capped 20).",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "cron": {
+            "description": "The cron expression to check (5 fields).",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timezone": {
+            "description": "IANA timezone; deployment default otherwise.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "cron"
+        ],
+        "type": "object"
+      },
+      "name": "preview_cron"
+    },
+    {
+      "description": "Publish the project as one atomic snapshot revision. ALWAYS call publish_plan first. A 409 (publish_warnings_unacknowledged / publish_test_failures) carries the warning list in its message — read it, fix the cause or consciously accept it, and only then resend with acknowledge_warnings / acknowledge_test_failures. NEVER blind-ack. Publisher-gated (project Owner/Admin).",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "acknowledge_test_failures": {
+            "description": "Accept known-failing test-case gates after reading them in the\n409's message. Defaults false.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "acknowledge_warnings": {
+            "description": "Accept the plan's WARNINGS (legacy nodes on reserved paths etc.)\nafter reading them in the 409's message. Defaults false.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "publish_apply"
+    },
+    {
+      "description": "What a publish would ship right now, with a one-line diff_summary per endpoint. Read this BEFORE publish_apply — it is the safety surface for the apply.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "publish_plan"
+    },
+    {
+      "description": "Roll the project back to the revision before the latest publish (nothing to roll back → 400). A script's `# uses:` modules are read live and are NOT rolled back. Publisher-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "publish_rollback"
+    },
+    {
+      "description": "One async run's state — the poll target for a detached test-run (run_id from test_run_script with run_async) or an X-Viat-Async endpoint call started from the console. Terminal states carry the output.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "run_id": {
+            "description": "The run_id a detached test-run or `X-Viat-Async` call returned.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id"
+        ],
+        "type": "object"
+      },
+      "name": "read_async_run"
+    },
+    {
+      "description": "Read the project's control-plane audit trail (who changed which scripts/endpoints/settings, when). Publisher-gated (project Owner/Admin). The audit of your own tables is a different surface: call_endpoint on /_audit/{resource}.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "actor": {
+            "description": "Filter by actor (user email or system principal).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "before": {
+            "description": "Keyset cursor: pass BOTH `before` and `before_id` from a prior\npage's `next_before` / `next_before_id`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "before_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Page size (default 100, capped at 500).",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "since": {
+            "description": "Only entries at or after this RFC3339 timestamp.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "read_audit"
+    },
+    {
+      "description": "Fetch one execution by request_id and its line_logs (capped). Returns execution summary + lines + truncation indicator.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "line_limit": {
+            "description": "Max log lines to return (default 500, capped at 2000).",
+            "format": "uint",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "request_id": {
+            "description": "Execution request_id (uuid).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id"
+        ],
+        "type": "object"
+      },
+      "name": "read_logs"
+    },
+    {
+      "description": "The most recent 50 messages a queue trigger consumed, with the execution each became. Editor-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "name": {
+            "description": "Queue trigger name.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "read_queue_trigger_fires"
+    },
+    {
+      "description": "Recent runs of one schedule, newest first. A run's request_id is what read_logs takes to see its output. The response has no next-page marker — page by passing the oldest row's started_at as `before`.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "before": {
+            "description": "RFC3339 timestamp cursor for paging. The response is a bare array\nwith no next-page marker — to page, pass the oldest row's\n`started_at`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Page size (default 20, capped at 200).",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Schedule name.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "read_schedule_runs"
+    },
+    {
+      "description": "Fetch one script's full source, language and input/output schemas. Same bare name in more than one folder → the API answers 409 telling you to pass ?folder= (it does not list the folders; list_scripts shows them); disambiguate with the folder arg.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "folder": {
+            "description": "Folder path; omit for the project root. Pass this when the bare name\nexists in more than one folder — the API refuses an ambiguous name\nwith 409 and names the folders.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Script name within the folder.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "read_script"
+    },
+    {
+      "description": "Fetch one workflow's YAML definition.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "folder": {
+            "description": "Folder path; omit for the project root.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Workflow name within the folder.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "read_workflow"
+    },
+    {
+      "description": "Resume a paused schedule; next_due is recomputed from now, so a long pause does not fire a burst. Member-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "name": {
+            "description": "Schedule name.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "resume_schedule"
+    },
+    {
+      "description": "Enable or disable an alert rule without touching its config. Publisher-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Rule name.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "enabled"
+        ],
+        "type": "object"
+      },
+      "name": "set_alert_enabled"
+    },
+    {
+      "description": "Enable or disable a queue trigger's consumption. Deliberately does NOT create/update triggers — a stock deployment refuses creation without ack_deadline_override (timeout ceiling 1800s > ack deadline 1500s) and needs an amqp resource first; configure from the console. Editor-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Queue trigger name.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "enabled"
+        ],
+        "type": "object"
+      },
+      "name": "set_queue_trigger_enabled"
+    },
+    {
+      "description": "FIRE the rule's channel once with a test payload — this REALLY SENDS to the webhook/chat/email/push destination, not a dry run. Returns delivered plus the error when it bounced. For push, delivered means provider acceptance, NOT confirmed handset receipt. Publisher-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "name": {
+            "description": "Rule name.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "test_alert"
+    },
+    {
+      "description": "Run a script's LIVE DRAFT as a test — no publish needed, no endpoint auth (runs as the platform; Editor-gated). The edit→test→publish loop's test step. A failing script is a successful tool result with ok:false and an `error` object, NOT an isError. Set run_async for long runs and poll the returned run_id with read_async_run. Async success/failure also triggers a best-effort notification to the initiating user's registered project devices, without output or error details.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "args": {
+            "additionalProperties": true,
+            "default": null,
+            "description": "The script's input (what `main` receives). Defaults to `{}`.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "folder": {
+            "description": "Folder path; omit for the project root.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Script name.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "record": {
+            "description": "Record the run's resource calls and return them per resource\n(sync runs only).",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "run_async": {
+            "description": "Detach: answer immediately with a `run_id` to poll via\n`read_async_run`, instead of holding the call for the run's length.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "timeout_ms": {
+            "description": "How long to wait for a synchronous run, in milliseconds\n(default 30000, clamped to 1000..60000).",
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "test_run_script"
+    },
+    {
+      "description": "Fire a schedule NOW, out of band from its cadence — the response's request_id is what read_logs takes for the run's output. 409 when a run is already active or its queue is busy/full. Member-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "name": {
+            "description": "Schedule name.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "trigger_schedule"
+    },
+    {
+      "description": "Take ONE endpoint out of the served snapshot; the rest of the last publish stands. System nodes are refused. Publisher-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "id": {
+            "description": "Endpoint node id.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "unpublish_endpoint"
+    },
+    {
+      "description": "Change which authorizers/gates guard an endpoint node: pass authz_gates to declare them here, inherit_authz_gates:true to go back to inheriting, or neither to leave untouched — omitted fields are re-sent as their current values, so they survive the update. Editor-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "allowed_authorizers": {
+            "description": "Authorizers allowed at this node (replaces the inherited list).",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "authz_gates": {
+            "description": "Authz-model gates to declare here (`[{type, action}]`).",
+            "items": true,
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Endpoint node id (from list_endpoints / create_endpoint).",
+            "type": "string"
+          },
+          "inherit_authz_gates": {
+            "description": "Clear this node's gates and inherit from the parent instead —\nmutually exclusive with `authz_gates`.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "override_authorizers": {
+            "description": "Make this node's authorizer list THE list (stop inheriting).",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "update_endpoint_auth"
+    },
+    {
+      "description": "Change what a node IS — segment, method, script/workflow binding, overrides, ws/crud config, path_override. Only passed fields are sent; the server's null-clears-field behaviour is not exposed here (clear from the console). Editor-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "crud_config": {
+            "description": "Replace a crud leaf's config."
+          },
+          "id": {
+            "description": "Endpoint node id.",
+            "type": "string"
+          },
+          "method": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "overrides": true,
+          "path_override": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "script_name": {
+            "description": "Rebind the leaf to another script.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "segment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workflow_name": {
+            "description": "Rebind the leaf to another workflow.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ws_config": {
+            "description": "Replace a websocket leaf's routes."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "update_endpoint_info"
+    },
+    {
+      "description": "Create or update an alert rule by name. kind: endpoint_errors (needs window_secs >= 60) | schedule_failures (must NOT be windowed). channel_kind: webhook | chat | email | push. Exactly ONE matching destination: webhook_url | email_to (needs SMTP) | chat_account+chat_id | push_resource (existing project push resource name or qualified path). Publisher-gated (Owner/Admin).",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "channel_kind": {
+            "description": "`webhook` | `chat` | `email` | `push`.",
+            "type": "string"
+          },
+          "chat_account": {
+            "description": "Chat account name — for `chat`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "chat_id": {
+            "description": "Chat id (group/user the message goes to) — for `chat`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email_to": {
+            "description": "Comma-separated recipient list — for `email` (needs SMTP configured).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "description": "Enabled right away (default true).",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "`endpoint_errors` (needs `window_secs` ≥ 60) | `schedule_failures`\n(must NOT be windowed).",
+            "type": "string"
+          },
+          "name": {
+            "description": "Rule name (identity for the upsert).",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "push_resource": {
+            "description": "Existing project push resource name or qualified path — for `push`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "threshold": {
+            "description": "How many failures inside the window trip the rule (≥ 1).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "webhook_url": {
+            "description": "The URL POSTed on fire — for `webhook`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "window_secs": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "threshold",
+          "channel_kind"
+        ],
+        "type": "object"
+      },
+      "name": "upsert_alert"
+    },
+    {
+      "description": "Create or replace a schedule by name — replacement is WHOLESALE: every field you pass (plus the defaults) is what the schedule becomes. Trigger: trigger_kind cron (+cron/timezone) | interval (+every_secs 10..86400) | once (+at, within 10 years). Target: target_kind script (+target_script) | workflow (+target_workflow) | endpoint (+target_method/target_path, must be PUBLISHED). Member-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "at": {
+            "description": "When to fire once, RFC3339 within 10 years — for `once`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "catch_up": {
+            "description": "Fire for occurrences missed while the server was down.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cron": {
+            "description": "Cron expression (5 fields) — for `cron`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "description": "Enabled right away (default true).",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "every_secs": {
+            "description": "Seconds between fires, 10..=86400 — for `interval`.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "inputs": {
+            "description": "Input object handed to every run."
+          },
+          "max_attempts": {
+            "description": "Retry attempts, 1..=10.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Schedule name (its identity; upserts by it).",
+            "type": "string"
+          },
+          "on_overlap": {
+            "description": "`skip` | `queue` | `parallel` — what a fire does while the previous\nrun is still going (default `skip`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "queue_cap": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "retry_backoff_secs": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "target_kind": {
+            "description": "`script` | `workflow` | `endpoint` (an endpoint target must be\nPUBLISHED).",
+            "type": "string"
+          },
+          "target_method": {
+            "description": "HTTP method — for `endpoint`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target_path": {
+            "description": "Endpoint path (e.g. `/orders/sync`) — for `endpoint`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target_script": {
+            "description": "Script name — for `script`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target_workflow": {
+            "description": "Workflow name — for `workflow`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timezone": {
+            "description": "IANA timezone for `cron` (deployment default otherwise).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trigger_kind": {
+            "description": "`cron` | `interval` | `once`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "trigger_kind",
+          "target_kind"
+        ],
+        "type": "object"
+      },
+      "name": "upsert_schedule"
+    },
+    {
+      "description": "Parse-and-validate a workflow YAML definition without saving anything. Check a definition here before writing it; an invalid one is rejected at write time with the same code. Editor-gated (Owner/Admin/Developer).",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "definition": {
+            "description": "The workflow YAML definition to check.",
+            "type": "string"
+          },
+          "name": {
+            "description": "Workflow name (the route requires the path segment; the definition\nbeing validated is what matters).",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "definition"
+        ],
+        "type": "object"
+      },
+      "name": "validate_workflow"
+    },
+    {
+      "description": "Create or update one script (an existing name+folder is updated with only the fields you pass; a new one needs language + content). The response's pending_endpoints names bound endpoints whose published snapshot is now stale — the change stays invisible to callers until you run publish_plan then publish_apply. This tool never moves a script between folders. Editor-gated (Owner/Admin/Developer).",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "content": {
+            "description": "The script body — required when creating; on update, the new source.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dedicated": {
+            "description": "Run on dedicated worker slot(s) instead of the shared pool.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "dedicated_count": {
+            "description": "How many dedicated slots (1..=32).",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "folder": {
+            "description": "Folder path naming where the script lives — omit for the project\nroot. Locates the script (create target / update lookup); this tool\nnever moves a script between folders.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "language": {
+            "description": "Language (`python`, `typescript`, …) — required when creating;\nfixed for the script's life thereafter.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Script name within the folder.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "write_script"
+    },
+    {
+      "description": "Create or update a workflow by name — the definition is required both ways (update replaces it wholesale; validate_workflow checks one first). pending_endpoints names bindings a publish is owed. Editor-gated.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "definition": {
+            "description": "The workflow YAML definition — validated at write; check it first\nwith validate_workflow. Required for both create and update.",
+            "type": "string"
+          },
+          "folder": {
+            "description": "Folder path; omit for the project root.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Workflow name.",
+            "type": "string"
+          },
+          "project": {
+            "description": "Project slug; falls back to default_project at the call site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "definition"
+        ],
+        "type": "object"
+      },
+      "name": "write_workflow"
+    }
+  ]
+}

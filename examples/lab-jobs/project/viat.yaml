@@ -1,0 +1,159 @@
+{
+  "project": {
+    "slug": "lab-jobs-example",
+    "name": "Lab jobs isolated example"
+  },
+  "roles": [
+    {
+      "name": "lab-operator",
+      "is_admin": false
+    },
+    {
+      "name": "adapter",
+      "is_admin": false
+    }
+  ],
+  "authorizers": [
+    {
+      "name": "password",
+      "kind": "password",
+      "config": {},
+      "default_role": "lab-operator"
+    },
+    {
+      "name": "lab-keys",
+      "kind": "api_key",
+      "config": {
+        "token_ttl_hours": 1
+      },
+      "default_role": "lab-operator"
+    },
+    {
+      "name": "callback-keys",
+      "kind": "api_key",
+      "config": {
+        "token_ttl_hours": 1
+      },
+      "default_role": "adapter"
+    }
+  ],
+  "scope_claims": [],
+  "authz": {
+    "subject_attrs": [
+      {
+        "name": "role",
+        "source": "role",
+        "ty": "text"
+      }
+    ],
+    "types": [
+      {
+        "name": "job",
+        "cross_tenant": true,
+        "attrs": [],
+        "actions": [
+          "submit",
+          "read",
+          "poll",
+          "cancel",
+          "event"
+        ]
+      }
+    ],
+    "rules": [
+      {
+        "type": "job",
+        "action": "submit",
+        "effect": "permit",
+        "expr": {
+          "any": [
+            {
+              "subj_only": {
+                "subj": "role",
+                "op": "eq",
+                "lit": "lab-operator"
+              }
+            },
+            {
+              "subj_only": {
+                "subj": "role",
+                "op": "eq",
+                "lit": "system:scheduler"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "job",
+        "action": "read",
+        "effect": "permit",
+        "expr": {
+          "any": [
+            {
+              "subj_only": {
+                "subj": "role",
+                "op": "eq",
+                "lit": "lab-operator"
+              }
+            },
+            {
+              "subj_only": {
+                "subj": "role",
+                "op": "eq",
+                "lit": "system:scheduler"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "job",
+        "action": "poll",
+        "effect": "permit",
+        "expr": {
+          "any": [
+            {
+              "subj_only": {
+                "subj": "role",
+                "op": "eq",
+                "lit": "lab-operator"
+              }
+            },
+            {
+              "subj_only": {
+                "subj": "role",
+                "op": "eq",
+                "lit": "system:scheduler"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "job",
+        "action": "cancel",
+        "effect": "permit",
+        "expr": {
+          "subj_only": {
+            "subj": "role",
+            "op": "eq",
+            "lit": "lab-operator"
+          }
+        }
+      },
+      {
+        "type": "job",
+        "action": "event",
+        "effect": "permit",
+        "expr": {
+          "subj_only": {
+            "subj": "role",
+            "op": "eq",
+            "lit": "adapter"
+          }
+        }
+      }
+    ]
+  }
+}

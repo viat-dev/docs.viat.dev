@@ -1,0 +1,22 @@
+{
+  "published_before": [],
+  "published_after": {
+    "post_id": "fixture-post",
+    "title": "Synthetic draft",
+    "body": "Not yet public."
+  },
+  "edited_draft": {
+    "post_id": "fixture-post",
+    "title": "Revised draft",
+    "body": "Still private."
+  },
+  "forbidden": [
+    "reader:create",
+    "reader:preview",
+    "reader:update",
+    "reader:publish",
+    "other-author:preview",
+    "other-author:update",
+    "author:publish"
+  ]
+}

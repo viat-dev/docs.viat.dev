@@ -1,0 +1,32 @@
+[
+  {
+    "job_id": "fixture-job",
+    "state": "queued",
+    "seq": 0
+  },
+  {
+    "job_id": "fixture-job",
+    "state": "running",
+    "seq": 2
+  },
+  {
+    "job_id": "fixture-job",
+    "state": "queued",
+    "seq": 1
+  },
+  {
+    "job_id": "fixture-job",
+    "state": "succeeded",
+    "seq": 3
+  },
+  {
+    "job_id": "fixture-job",
+    "state": "succeeded",
+    "seq": 3
+  },
+  {
+    "job_id": "fixture-job",
+    "state": "running",
+    "seq": 4
+  }
+]

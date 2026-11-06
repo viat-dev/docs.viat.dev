@@ -1,0 +1,1 @@
+{"id":"weixin-assistant","server_version":"1.1.0","validation_command":["python3","-I","validate.py"],"external_side_effects_default":false}

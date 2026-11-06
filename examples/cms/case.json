@@ -1,0 +1,12 @@
+{
+  "id": "cms",
+  "server_version": "1.1.0",
+  "validation_command": [
+    "python3",
+    "-I",
+    "validate.py"
+  ],
+  "external_side_effects_default": false,
+  "validation_scope": "standard-library unit checks of deployable pure logic; integration unverified",
+  "project_slug": "cms-example"
+}

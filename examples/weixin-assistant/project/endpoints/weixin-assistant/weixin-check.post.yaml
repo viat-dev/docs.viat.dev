@@ -1,0 +1,1 @@
+{"method":"POST","target":{"kind":"workflow","ref":"wx_check"},"allowed_authorizers":[],"authz_gates":[],"override_authorizers":true,"override_permissions":false,"overrides":{"strict":true,"body_fields":{"message":{"type":"json","default":null}},"query_params":{}}}

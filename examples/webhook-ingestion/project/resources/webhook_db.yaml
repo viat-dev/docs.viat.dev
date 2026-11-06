@@ -1,0 +1,8 @@
+name: webhook_db
+kind: sqlite
+plain:
+  path: /approved-example-root/webhook-ingestion.sqlite
+  read_only: false
+  create_if_missing: false
+secret: {}
+allowed_authorizers: []

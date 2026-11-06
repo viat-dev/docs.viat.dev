@@ -1,0 +1,12 @@
+method: POST
+target: {kind: script, ref: ingest}
+allowed_authorizers: [case_machine]
+authz_gates: []
+override_authorizers: true
+override_permissions: false
+overrides:
+  raw_body: true
+  strict: true
+  required_headers: [x-event-timestamp, x-event-signature]
+  rate_limit:
+    endpoint: {requests: 60, window_secs: 60}

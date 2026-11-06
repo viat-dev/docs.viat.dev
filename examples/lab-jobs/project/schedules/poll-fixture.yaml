@@ -1,0 +1,20 @@
+{
+  "name": "poll-fixture",
+  "trigger": {
+    "kind": "interval",
+    "every_secs": 3600
+  },
+  "target": {
+    "kind": "script",
+    "name": "jobs"
+  },
+  "inputs": {
+    "op": "poll",
+    "job_id": "fixture-job",
+    "opt_in": false
+  },
+  "enabled": false,
+  "on_overlap": "skip",
+  "max_attempts": 1,
+  "catch_up": false
+}

@@ -1,0 +1,22 @@
+{
+  "name": "submit-fixture",
+  "trigger": {
+    "kind": "interval",
+    "every_secs": 3600
+  },
+  "target": {
+    "kind": "workflow",
+    "name": "submit_job"
+  },
+  "inputs": {
+    "job_id": "fixture-job",
+    "payload": {
+      "task": "synthetic"
+    },
+    "opt_in": false
+  },
+  "enabled": false,
+  "on_overlap": "skip",
+  "max_attempts": 1,
+  "catch_up": false
+}

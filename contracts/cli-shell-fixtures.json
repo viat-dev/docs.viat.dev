@@ -1,0 +1,12 @@
+[
+  {"command":"viat apikey create cms-keys --user cms-reader --name cms-reader-test > records/reader.key","argv":["viat","apikey","create","cms-keys","--user","cms-reader","--name","cms-reader-test"]},
+  {"command":"viat apikey create cms-keys --user cms-author-a --name cms-author-test > records/author.key","argv":["viat","apikey","create","cms-keys","--user","cms-author-a","--name","cms-author-test"]},
+  {"command":"viat apikey create cms-keys --user cms-author-b --name cms-other-test > records/other.key","argv":["viat","apikey","create","cms-keys","--user","cms-author-b","--name","cms-other-test"]},
+  {"command":"viat apikey create cms-keys --user cms-editor --name cms-editor-test > records/editor.key","argv":["viat","apikey","create","cms-keys","--user","cms-editor","--name","cms-editor-test"]},
+  {"command":"viat apikey list cms-keys > records/key-rows.txt","argv":["viat","apikey","list","cms-keys"]},
+  {"command":"viat apikey create lab-keys --user lab-operator-user --name lab-operator-test > records/operator.key","argv":["viat","apikey","create","lab-keys","--user","lab-operator-user","--name","lab-operator-test"]},
+  {"command":"viat apikey create callback-keys --user lab-adapter-user --name lab-callback-test > records/callback.key","argv":["viat","apikey","create","callback-keys","--user","lab-adapter-user","--name","lab-callback-test"]},
+  {"command":"viat apikey list lab-keys > records/operator-key-rows.txt","argv":["viat","apikey","list","lab-keys"]},
+  {"command":"viat apikey list callback-keys > records/callback-key-rows.txt","argv":["viat","apikey","list","callback-keys"]},
+  {"command":"viat license activate - --json < activation-code.txt","argv":["viat","license","activate","-","--json"]}
+]

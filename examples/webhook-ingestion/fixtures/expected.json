@@ -1,0 +1,6 @@
+{
+  "first": {"event_id": "evt_fixture_001", "status": "processed"},
+  "repeat": {"event_id": "evt_fixture_001", "status": "duplicate"},
+  "total_cents": 1250,
+  "failures": {"bad_signature": "invalid_signature", "stale": "stale_event", "changed_body": "event_conflict", "malformed": "invalid_event", "oversize": "event_too_large"}
+}

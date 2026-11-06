@@ -1,0 +1,17 @@
+{
+  "dry_run": {
+    "dry_run": true,
+    "job_id": "fixture-job",
+    "op": "submit"
+  },
+  "decisions": [
+    "applied",
+    "applied",
+    "stale",
+    "applied",
+    "stale",
+    "terminal"
+  ],
+  "final_state": "succeeded",
+  "final_seq": 3
+}

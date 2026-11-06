@@ -1,0 +1,206 @@
+{
+  "project": {
+    "slug": "cms-example",
+    "name": "CMS isolated example"
+  },
+  "roles": [
+    {
+      "name": "reader",
+      "is_admin": false
+    },
+    {
+      "name": "author",
+      "is_admin": false
+    },
+    {
+      "name": "editor",
+      "is_admin": false
+    }
+  ],
+  "authorizers": [
+    {
+      "name": "password",
+      "kind": "password",
+      "config": {},
+      "default_role": "reader"
+    },
+    {
+      "name": "cms-keys",
+      "kind": "api_key",
+      "config": {
+        "token_ttl_hours": 1
+      },
+      "default_role": "reader"
+    }
+  ],
+  "scope_claims": [],
+  "authz": {
+    "subject_attrs": [
+      {
+        "name": "role",
+        "source": "role",
+        "ty": "text"
+      },
+      {
+        "name": "identity",
+        "source": "identity",
+        "ty": "text"
+      }
+    ],
+    "types": [
+      {
+        "name": "post",
+        "cross_tenant": true,
+        "attrs": [
+          {
+            "name": "owner",
+            "kind": "local",
+            "column_name": "owner"
+          }
+        ],
+        "actions": [
+          "read",
+          "create",
+          "preview",
+          "update",
+          "publish"
+        ]
+      }
+    ],
+    "rules": [
+      {
+        "type": "post",
+        "action": "read",
+        "effect": "permit",
+        "expr": {
+          "any": [
+            {
+              "subj_only": {
+                "subj": "role",
+                "op": "eq",
+                "lit": "reader"
+              }
+            },
+            {
+              "subj_only": {
+                "subj": "role",
+                "op": "eq",
+                "lit": "author"
+              }
+            },
+            {
+              "subj_only": {
+                "subj": "role",
+                "op": "eq",
+                "lit": "editor"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "post",
+        "action": "create",
+        "effect": "permit",
+        "expr": {
+          "any": [
+            {
+              "subj_only": {
+                "subj": "role",
+                "op": "eq",
+                "lit": "author"
+              }
+            },
+            {
+              "subj_only": {
+                "subj": "role",
+                "op": "eq",
+                "lit": "editor"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "post",
+        "action": "preview",
+        "effect": "permit",
+        "expr": {
+          "any": [
+            {
+              "all": [
+                {
+                  "subj_only": {
+                    "subj": "role",
+                    "op": "eq",
+                    "lit": "author"
+                  }
+                },
+                {
+                  "obj": {
+                    "attr": "owner",
+                    "op": "eq",
+                    "subj": "identity"
+                  }
+                }
+              ]
+            },
+            {
+              "subj_only": {
+                "subj": "role",
+                "op": "eq",
+                "lit": "editor"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "post",
+        "action": "update",
+        "effect": "permit",
+        "expr": {
+          "any": [
+            {
+              "all": [
+                {
+                  "subj_only": {
+                    "subj": "role",
+                    "op": "eq",
+                    "lit": "author"
+                  }
+                },
+                {
+                  "obj": {
+                    "attr": "owner",
+                    "op": "eq",
+                    "subj": "identity"
+                  }
+                }
+              ]
+            },
+            {
+              "subj_only": {
+                "subj": "role",
+                "op": "eq",
+                "lit": "editor"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "post",
+        "action": "publish",
+        "effect": "permit",
+        "expr": {
+          "subj_only": {
+            "subj": "role",
+            "op": "eq",
+            "lit": "editor"
+          }
+        }
+      }
+    ]
+  }
+}

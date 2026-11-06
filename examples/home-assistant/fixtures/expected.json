@@ -1,0 +1,1 @@
+{"read":{"entity_id":"sensor.example_temperature","state":"21.5","fixture":true},"disabled":{"executed":false,"reason":"actions_disabled_or_unconfirmed"},"accepted":{"executed":true,"entity_id":"light.example_desk","action":"light.turn_on","note":"HTTP accepted; independently verify the physical state"},"default_denial":{"status":403,"code":"forbidden"}}

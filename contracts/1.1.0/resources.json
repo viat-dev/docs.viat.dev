@@ -1,0 +1,1678 @@
+{
+  "count": 20,
+  "resources": [
+    {
+      "kind": "amqp",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "default": 5672,
+              "format": "uint16",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "tls": {
+              "default": false,
+              "type": "boolean"
+            },
+            "vhost": {
+              "default": "/",
+              "type": "string"
+            }
+          },
+          "required": [
+            "host"
+          ],
+          "title": "AmqpPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "password": {
+              "default": "",
+              "type": "string"
+            },
+            "username": {
+              "default": "",
+              "type": "string"
+            }
+          },
+          "title": "AmqpSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "username",
+        "password"
+      ]
+    },
+    {
+      "kind": "cloud_api",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "definitions": {
+            "CloudProvider": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "aliyun_rpc_v1"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "tencent_tc3"
+                  ],
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "properties": {
+            "api_version": {
+              "type": "string"
+            },
+            "endpoint": {
+              "type": "string"
+            },
+            "provider": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/CloudProvider"
+                }
+              ]
+            },
+            "proxy": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "region": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "service": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "api_version",
+            "endpoint",
+            "provider"
+          ],
+          "title": "CloudApiPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "definitions": {
+            "SecretField": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              ]
+            }
+          },
+          "properties": {
+            "access_key_id": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/SecretField"
+                }
+              ],
+              "default": ""
+            },
+            "access_key_secret": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/SecretField"
+                }
+              ],
+              "default": ""
+            },
+            "security_token": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/SecretField"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "title": "CloudApiSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "access_key_id",
+        "access_key_secret",
+        "security_token"
+      ]
+    },
+    {
+      "kind": "config",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "data": {
+              "default": null
+            },
+            "schema": {}
+          },
+          "title": "ConfigPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "ConfigSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": []
+    },
+    {
+      "kind": "crypto_key",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "definitions": {
+            "CryptoAlgorithm": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "aes"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "hmac"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "rsa"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "ecdsa_p256"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "ed25519"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "sm2"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "sm4"
+                  ],
+                  "type": "string"
+                }
+              ]
+            },
+            "KeyEncoding": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "auto",
+                    "base64",
+                    "hex"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "utf8"
+                  ],
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "properties": {
+            "algorithm": {
+              "$ref": "#/definitions/CryptoAlgorithm"
+            },
+            "key_encoding": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/KeyEncoding"
+                }
+              ],
+              "default": "auto"
+            },
+            "key_id": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "public_key": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "algorithm"
+          ],
+          "title": "CryptoKeyPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "key": {
+              "default": "",
+              "type": "string"
+            },
+            "previous_key": {
+              "default": "",
+              "type": "string"
+            },
+            "private_key": {
+              "default": "",
+              "type": "string"
+            }
+          },
+          "title": "CryptoKeySecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "key",
+        "private_key",
+        "previous_key"
+      ]
+    },
+    {
+      "kind": "graphql",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "definitions": {
+            "GraphQlAuthType": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "token"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "caller_token"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "viat_identity"
+                  ],
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "properties": {
+            "auth_type": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/GraphQlAuthType"
+                }
+              ],
+              "default": "token"
+            },
+            "endpoint": {
+              "type": "string"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "default": {},
+              "type": "object"
+            },
+            "identity_ttl_secs": {
+              "default": null,
+              "format": "uint32",
+              "minimum": 0.0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "proxy": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "endpoint"
+          ],
+          "title": "GraphQlPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "auth_token": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "title": "GraphQlSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "auth_token"
+      ]
+    },
+    {
+      "kind": "http_api",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "definitions": {
+            "HttpAuthType": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "none",
+                    "bearer",
+                    "basic",
+                    "header_key"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "caller_token"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "viat_identity"
+                  ],
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "properties": {
+            "auth_type": {
+              "$ref": "#/definitions/HttpAuthType"
+            },
+            "base_url": {
+              "type": "string"
+            },
+            "custom_headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "default": {},
+              "type": "object"
+            },
+            "identity_assert": {
+              "default": false,
+              "type": "boolean"
+            },
+            "identity_forward_token": {
+              "default": false,
+              "type": "boolean"
+            },
+            "identity_ttl_secs": {
+              "default": null,
+              "format": "uint32",
+              "minimum": 0.0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "proxy": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "auth_type",
+            "base_url"
+          ],
+          "title": "HttpApiPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "header_name": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "password": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "token": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "username": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "title": "HttpApiSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "token",
+        "username",
+        "password",
+        "header_name"
+      ]
+    },
+    {
+      "kind": "imap",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "definitions": {
+            "MailTls": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "none"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "starttls"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "implicit"
+                  ],
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "properties": {
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "format": "uint16",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "tls": {
+              "$ref": "#/definitions/MailTls"
+            }
+          },
+          "required": [
+            "host",
+            "port",
+            "tls"
+          ],
+          "title": "ImapPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "password": {
+              "type": "string"
+            },
+            "username": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "password",
+            "username"
+          ],
+          "title": "ImapSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "username",
+        "password"
+      ]
+    },
+    {
+      "kind": "library",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "properties": {
+            "script": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "script"
+          ],
+          "title": "LibraryPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "LibrarySecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": []
+    },
+    {
+      "kind": "llm",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "definitions": {
+            "LlmProvider": {
+              "enum": [
+                "openai",
+                "anthropic",
+                "azure",
+                "custom"
+              ],
+              "type": "string"
+            }
+          },
+          "properties": {
+            "endpoint": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "extra_params": {
+              "additionalProperties": true,
+              "default": {},
+              "type": "object"
+            },
+            "model": {
+              "type": "string"
+            },
+            "provider": {
+              "$ref": "#/definitions/LlmProvider"
+            },
+            "proxy": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "model",
+            "provider"
+          ],
+          "title": "LlmPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "api_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "api_key"
+          ],
+          "title": "LlmSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "api_key"
+      ]
+    },
+    {
+      "kind": "mongodb",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "database": {
+              "type": "string"
+            },
+            "hosts": {
+              "type": "string"
+            },
+            "options": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "srv": {
+              "default": false,
+              "type": "boolean"
+            },
+            "tls": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "database",
+            "hosts"
+          ],
+          "title": "MongoPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "password": {
+              "default": "",
+              "type": "string"
+            },
+            "username": {
+              "default": "",
+              "type": "string"
+            }
+          },
+          "title": "MongoSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "username",
+        "password"
+      ]
+    },
+    {
+      "kind": "mysql",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "definitions": {
+            "AuthzTableBinding": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/AuthzTableMapping"
+                }
+              ]
+            },
+            "AuthzTableMapping": {
+              "additionalProperties": false,
+              "properties": {
+                "actions": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            }
+          },
+          "properties": {
+            "authz_tables": {
+              "additionalProperties": {
+                "$ref": "#/definitions/AuthzTableBinding"
+              },
+              "type": "object"
+            },
+            "database": {
+              "type": "string"
+            },
+            "graphql_overlay": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "format": "uint16",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "ssl": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "database",
+            "host",
+            "port"
+          ],
+          "title": "MySqlPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "password": {
+              "type": "string"
+            },
+            "user": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "password",
+            "user"
+          ],
+          "title": "MySqlSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "user",
+        "password"
+      ]
+    },
+    {
+      "kind": "postgresql",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "definitions": {
+            "AuditConfig": {
+              "additionalProperties": false,
+              "properties": {
+                "lock_down": {
+                  "type": "boolean"
+                },
+                "schema": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "table": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tables": {
+                  "items": {
+                    "$ref": "#/definitions/AuditTable"
+                  },
+                  "type": "array"
+                },
+                "unattributed": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/AuditUnattributed"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "type": "object"
+            },
+            "AuditTable": {
+              "properties": {
+                "ignore_columns": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "reason_required": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "ignore_columns",
+                "name",
+                "reason_required"
+              ],
+              "type": "object"
+            },
+            "AuditUnattributed": {
+              "enum": [
+                "reject",
+                "record"
+              ],
+              "type": "string"
+            },
+            "AuthzTableBinding": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/AuthzTableMapping"
+                }
+              ]
+            },
+            "AuthzTableMapping": {
+              "additionalProperties": false,
+              "properties": {
+                "actions": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            }
+          },
+          "properties": {
+            "audit": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/AuditConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "authz_tables": {
+              "additionalProperties": {
+                "$ref": "#/definitions/AuthzTableBinding"
+              },
+              "type": "object"
+            },
+            "database": {
+              "type": "string"
+            },
+            "graphql_overlay": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "graphql_schemas": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "format": "uint16",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "ssl": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "database",
+            "host",
+            "port"
+          ],
+          "title": "PostgresPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "password": {
+              "type": "string"
+            },
+            "user": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "password",
+            "user"
+          ],
+          "title": "PostgresSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "user",
+        "password"
+      ]
+    },
+    {
+      "kind": "push",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "definitions": {
+            "PushProvider": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "jpush"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "fcm"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "apns"
+                  ],
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "properties": {
+            "apns_production": {
+              "default": false,
+              "type": "boolean"
+            },
+            "app_key": {
+              "default": "",
+              "type": "string"
+            },
+            "base_url": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "bundle_id": {
+              "default": "",
+              "type": "string"
+            },
+            "environment": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "project_id": {
+              "default": "",
+              "type": "string"
+            },
+            "provider": {
+              "$ref": "#/definitions/PushProvider"
+            }
+          },
+          "required": [
+            "provider"
+          ],
+          "title": "PushPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "key_id": {
+              "default": "",
+              "type": "string"
+            },
+            "master_secret": {
+              "default": "",
+              "type": "string"
+            },
+            "p8_key": {
+              "default": "",
+              "type": "string"
+            },
+            "service_account": {
+              "default": "",
+              "type": "string"
+            },
+            "team_id": {
+              "default": "",
+              "type": "string"
+            }
+          },
+          "title": "PushSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "master_secret",
+        "service_account",
+        "p8_key",
+        "key_id",
+        "team_id"
+      ]
+    },
+    {
+      "kind": "redis",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "db": {
+              "default": 0,
+              "format": "uint32",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "default": 6379,
+              "format": "uint16",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "tls": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "host"
+          ],
+          "title": "RedisPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "password": {
+              "default": "",
+              "type": "string"
+            },
+            "username": {
+              "default": "",
+              "type": "string"
+            }
+          },
+          "title": "RedisSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "username",
+        "password"
+      ]
+    },
+    {
+      "kind": "s3",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "allowed_authorizers": {
+              "deprecated": true,
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "bucket": {
+              "type": "string"
+            },
+            "endpoint": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "path_style": {
+              "default": false,
+              "type": "boolean"
+            },
+            "region": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "bucket",
+            "region"
+          ],
+          "title": "S3Plain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "access_key": {
+              "type": "string"
+            },
+            "secret_key": {
+              "type": "string"
+            },
+            "session_token": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "access_key",
+            "secret_key"
+          ],
+          "title": "S3Secret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "access_key",
+        "secret_key",
+        "session_token"
+      ]
+    },
+    {
+      "kind": "secret",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "description": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "title": "SecretPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "value"
+          ],
+          "title": "SecretSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "value"
+      ]
+    },
+    {
+      "kind": "smtp",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "definitions": {
+            "MailTls": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "none"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "starttls"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "implicit"
+                  ],
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "properties": {
+            "from_address": {
+              "type": "string"
+            },
+            "from_name": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "format": "uint16",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "tls": {
+              "$ref": "#/definitions/MailTls"
+            }
+          },
+          "required": [
+            "from_address",
+            "host",
+            "port",
+            "tls"
+          ],
+          "title": "SmtpPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "password": {
+              "default": "",
+              "type": "string"
+            },
+            "username": {
+              "default": "",
+              "type": "string"
+            }
+          },
+          "title": "SmtpSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "username",
+        "password"
+      ]
+    },
+    {
+      "kind": "sqlite",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "definitions": {
+            "AuthzTableBinding": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/AuthzTableMapping"
+                }
+              ]
+            },
+            "AuthzTableMapping": {
+              "additionalProperties": false,
+              "properties": {
+                "actions": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            }
+          },
+          "properties": {
+            "authz_tables": {
+              "additionalProperties": {
+                "$ref": "#/definitions/AuthzTableBinding"
+              },
+              "type": "object"
+            },
+            "create_if_missing": {
+              "type": "boolean"
+            },
+            "graphql_overlay": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "path": {
+              "type": "string"
+            },
+            "read_only": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "title": "SqlitePlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "SqliteSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": []
+    },
+    {
+      "kind": "sqlserver",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "definitions": {
+            "SqlServerEncryption": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "required"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "trust_cert"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "off"
+                  ],
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "properties": {
+            "database": {
+              "type": "string"
+            },
+            "encryption": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/SqlServerEncryption"
+                }
+              ],
+              "default": "required"
+            },
+            "host": {
+              "type": "string"
+            },
+            "instance": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "port": {
+              "default": 1433,
+              "format": "uint16",
+              "minimum": 0.0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "database",
+            "host"
+          ],
+          "title": "SqlServerPlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "password": {
+              "type": "string"
+            },
+            "username": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "password",
+            "username"
+          ],
+          "title": "SqlServerSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "username",
+        "password"
+      ]
+    },
+    {
+      "kind": "storage",
+      "schemas": {
+        "plain": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "definitions": {
+            "StorageBackend": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "local"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "s3"
+                  ],
+                  "type": "string"
+                }
+              ]
+            },
+            "StorageMetadata": {
+              "properties": {
+                "resource": {
+                  "type": "string"
+                },
+                "table": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "resource"
+              ],
+              "type": "object"
+            }
+          },
+          "properties": {
+            "allowed_types": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "backend": {
+              "$ref": "#/definitions/StorageBackend"
+            },
+            "bucket": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "endpoint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "max_file_bytes": {
+              "format": "uint64",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "metadata": {
+              "$ref": "#/definitions/StorageMetadata"
+            },
+            "path_style": {
+              "type": "boolean"
+            },
+            "prefix": {
+              "type": "string"
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "root": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "backend",
+            "metadata"
+          ],
+          "title": "StoragePlain",
+          "type": "object"
+        },
+        "secret": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "access_key": {
+              "default": "",
+              "type": "string"
+            },
+            "secret_key": {
+              "default": "",
+              "type": "string"
+            },
+            "session_token": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "title": "StorageSecret",
+          "type": "object"
+        }
+      },
+      "secret_fields": [
+        "access_key",
+        "secret_key",
+        "session_token"
+      ]
+    }
+  ],
+  "schema_version": 1,
+  "source": {
+    "dirty": true,
+    "paths": [
+      "crates/viat-core/src/doc_contracts.rs",
+      "crates/viat-core/src/types/resource.rs",
+      "scripts/doc-contract-support.rs"
+    ],
+    "sha": "03751a679ed0205505ab9fae5207a66189c47a18"
+  }
+}

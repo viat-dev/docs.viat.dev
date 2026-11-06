@@ -1,0 +1,1 @@
+{"name":"pd_store","kind":"sqlite","plain":{"path":"/var/lib/viat/examples/paper-digest.sqlite","read_only":false,"create_if_missing":true},"secret":{}}

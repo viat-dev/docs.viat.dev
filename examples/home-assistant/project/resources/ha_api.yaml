@@ -1,0 +1,1 @@
+{"name":"ha_api","kind":"http_api","plain":{"base_url":"https://home-assistant.example.test","auth_type":"bearer","custom_headers":{"Accept":"application/json"}},"secret":{}}

@@ -1,0 +1,12 @@
+method: POST
+target: {kind: workflow, ref: daily_report}
+allowed_authorizers: [case_machine]
+authz_gates: []
+override_authorizers: true
+override_permissions: false
+overrides:
+  strict: true
+  body_fields:
+    start_date: {type: string, default: ''}
+    end_date: {type: string, default: ''}
+    send: {type: bool, default: false}

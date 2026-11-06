@@ -1,0 +1,34 @@
+{
+  "method": "POST",
+  "target": {
+    "kind": "script",
+    "ref": "posts"
+  },
+  "allowed_authorizers": [
+    "cms-keys"
+  ],
+  "authz_gates": [],
+  "override_authorizers": true,
+  "override_permissions": true,
+  "overrides": {
+    "strict": true,
+    "body_fields": {
+      "op": {
+        "type": "string",
+        "required": true
+      },
+      "post_id": {
+        "type": "string",
+        "default": ""
+      },
+      "title": {
+        "type": "string",
+        "default": ""
+      },
+      "body": {
+        "type": "string",
+        "default": ""
+      }
+    }
+  }
+}

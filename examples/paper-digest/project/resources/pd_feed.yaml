@@ -1,0 +1,1 @@
+{"name":"pd_feed","kind":"http_api","plain":{"base_url":"https://feed.example.test","auth_type":"none","custom_headers":{"Accept":"application/rss+xml"}},"secret":{}}

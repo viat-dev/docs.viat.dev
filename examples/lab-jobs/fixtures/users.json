@@ -1,0 +1,10 @@
+[
+  {
+    "identity": "lab-operator-user",
+    "role": "lab-operator"
+  },
+  {
+    "identity": "lab-adapter-user",
+    "role": "adapter"
+  }
+]

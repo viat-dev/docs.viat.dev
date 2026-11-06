@@ -1,0 +1,34 @@
+{
+  "inputs": {
+    "job_id": {
+      "type": "string",
+      "default": "fixture-job"
+    },
+    "payload": {
+      "type": "object",
+      "default": {
+        "task": "synthetic"
+      }
+    },
+    "opt_in": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "steps": [
+    {
+      "id": "submit",
+      "script": "jobs",
+      "args": {
+        "op": "submit",
+        "job_id": "$inputs.job_id",
+        "payload": "$inputs.payload",
+        "opt_in": "$inputs.opt_in"
+      }
+    }
+  ],
+  "outputs": {
+    "job": "$submit.output"
+  },
+  "timeout": 30
+}

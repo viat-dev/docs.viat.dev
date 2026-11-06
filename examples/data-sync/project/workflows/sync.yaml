@@ -1,0 +1,11 @@
+inputs:
+  batch_size: {type: integer, default: 2}
+steps:
+  - id: page
+    script: sync_batch
+    args:
+      batch_size: $inputs.batch_size
+    on_error: fail
+outputs:
+  page: $page.output
+timeout: 30
