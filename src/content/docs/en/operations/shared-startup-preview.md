@@ -31,7 +31,7 @@ A worker that reached READY but lost publication eligibility is drained outside 
 
 ## Limits and shutdown
 
-This stage **does not yet move auto-promotion and explicit reconcile's directory preparation/READY waits outside the state lock**. Those paths can still affect warm requests while actually starting workers; a later stage handles them. Improvements for shared misses must not be described as eliminating publication or auto-promotion pauses.
+Stage two itself **does not move auto-promotion and explicit reconcile's directory preparation/READY waits outside the state lock**. Improvements for shared misses must not be described as eliminating publication or auto-promotion pauses. See the [stage-three preview](dedicated-startup-preview.md) for the subsequent changes and replacement-wait trade-offs.
 
 Shutdown closes new admission, cancels pending shared starts, and waits for tracked startup cleanup. New shared slots cannot publish after closing. Dedicated policy tasks, asynchronous drains, and overall shutdown coordination have not all been redesigned. This stage does not promise to terminate arbitrary descendant process trees or make shared capacity a hard PID limit including draining processes.
 
