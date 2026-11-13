@@ -31,6 +31,10 @@ The following is a configuration fragment, not an executed business migration:
 
 In the console parameter editor, enter `null` as the default text; leave the cell blank for no default. CLI endpoint YAML preserves the same distinction through `viat pull` and `viat push`. To remove a default, omit its key from the replacement declaration; do not use null as a deletion marker.
 
+For the string value "null", enter `"null"`; for an empty string, enter `""`. Existing defaults are rendered as JSON, including string quotes, so saving the form does not reinterpret strings or trim significant whitespace. Ordinary string defaults can still be entered without quotes; JSON-looking strings and strings with significant surrounding whitespace require quotes.
+
+Use both the corrected server and CLI. Older CLI versions also normalize a field's `default: null` to absence when comparing endpoints: `diff` can hide the change and `push` can skip the update even against a corrected server. The corrected comparison recognizes both adding and removing a null default, while still skipping genuinely unchanged declarations. This does not change the management API's separate whole-object `overrides: null` clearing behavior or the CLI's unmanaged behavior when the entire overrides field is omitted.
+
 ## CRUD and recovery boundaries
 
 [CRUD](crud.md) receives bound arguments after the HTTP contract. A body default can therefore explicitly provide a nullable writable column's null instead of leaving it omitted. Database constraints still apply. This is distinct from `crud_config.defaults`, whose platform-resolved identity values cannot be overridden by callers and do not allow null. No authorization rule, writable allowlist, unknown-field restriction, or database default is changed by this fix.
@@ -39,4 +43,4 @@ A default erased by an earlier save cannot be reconstructed from an absent key. 
 
 ## Verification boundary
 
-Regression tests cover JSON absence/null round-trips, CLI YAML through the API type, and API save/read/publish followed by real Python dispatch, including invalid scalar null-default rejection. The console regression covers editor round-tripping. These are not evidence of a completed business-endpoint migration or verification against an external production database.
+Regression tests cover JSON absence/null round-trips, CLI YAML through the API type, and API save/read/publish followed by real Python dispatch, including invalid scalar null-default rejection. The console regression covers editor round-tripping. CLI comparison tests are checked against the server's shared type; a real CLI process against a local HTTP stub covers adding/removing null defaults and skipping unchanged declarations. These are not evidence of a completed business-endpoint migration or verification against an external production database.
