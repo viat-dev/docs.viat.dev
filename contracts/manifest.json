@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "edition": "1.1.0",
+  "edition": "1.4.0",
   "default_locale": "zh-cn",
   "locales": [
     "zh-cn",
@@ -10,7 +10,7 @@
   "server": {
     "version": "1.1.0",
     "release_source": "fd340879076a87c2662c454788178eecb05d0036",
-    "inspected_main": "03751a679ed0205505ab9fae5207a66189c47a18"
+    "inspected_main": "2a3a54da08f88abc792e113d06a502cbe257792b"
   },
   "client": {
     "version": "0.1.0",
@@ -25,22 +25,22 @@
     }
   ],
   "contract_bundle": {
-    "directory": "contracts/1.1.0",
-    "source_sha": "03751a679ed0205505ab9fae5207a66189c47a18",
-    "source_dirty": true,
+    "directory": "contracts/1.4.0",
+    "source_sha": "2a3a54da08f88abc792e113d06a502cbe257792b",
+    "source_dirty": false,
     "review_status": "candidate",
     "files": {
       "resources.json": {
-        "sha256": "940753c514722d1ed864bf48ce8eceac3de23f01c342fc742b98f9fa767d3d93"
+        "sha256": "19d9ab1f65bd6bb5f0a07dbaa981aaa343cd9866458560c8181d97258fa4abb7"
       },
       "languages.json": {
-        "sha256": "9ac01e61726c4354db7728f98b6ef459f2d0978425885dcc3614c501cd5bc4cb"
+        "sha256": "a2cd8ea0e69d52476d1996cc1d182360ebbd9194afc24c11c75770010b657e6a"
       },
       "cli.json": {
-        "sha256": "f182af60db16d0028889978a38086b5fd1064089abcd95b38d16cd439266b72a"
+        "sha256": "311ad65a8bc319141ea8bf023cd42631ed5ab1773b3dfa1cd1e50788a88acfae"
       },
       "mcp-tools.json": {
-        "sha256": "c75aa1deb0eb4bfaa7a83b086787b125ba32bdffb40ad15ed1097e8a16a72c7a"
+        "sha256": "9e095f81a3b82b6e48cc6fe51c5acc93869a7f2464640ab9e25969ae32c1fbf8"
       }
     }
   },
