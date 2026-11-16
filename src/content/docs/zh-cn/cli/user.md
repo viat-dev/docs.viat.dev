@@ -449,7 +449,7 @@ viat user set-role teammate@example.invalid operator
 
 **失败处理、验证与清理。** 降级最后 Owner 前先提升另一个。记录旧角色、user ls 验证，恢复旧值回退。不要为修项目成员问题而提升平台权限。
 
-## 实现核对依据
+## 核验依据
 
 语法来自固定 Clap 合同与 main.rs；行为/权限核对以下源文件，路径相对产品仓库根。
 

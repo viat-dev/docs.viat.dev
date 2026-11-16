@@ -9,11 +9,27 @@ contract_ids: []
 
 # PostgreSQL CRUD endpoints
 
-CRUD is a native endpoint target, not a generated script or a generic database browser. It supports **postgresql resources only** and exposed, post-overlay table/column names. Each leaf performs one operation, under ordinary endpoint authorizers, gates, rate limits and logging. Create/edit requires content-edit rights; publish requires publish rights; callers need published route access and the applicable row authorization. Prerequisites: a PostgreSQL resource with a refreshed mapped schema, a table, primary key for key operations, and a deliberate row-scope policy for writes.
+CRUD is a **native endpoint target**: without writing a script, it exposes a
+PostgreSQL table's create/read/update/delete as controlled REST routes. It
+is not a generated script and not a generic database browser.
+
+Four things to internalize:
+
+- **postgresql resources only**, using post-overlay table/column names.
+- Each leaf performs exactly one operation, under ordinary endpoint
+  authorizers, gates, rate limits and logging.
+- Permissions are two-layer: create/edit needs content-edit rights and
+  publish needs publish rights; **callers must satisfy both the published
+  route access and the row-level authorization**.
+- Prerequisites: a refreshed resource schema mapping, the table's existence,
+  a primary key for key operations, and a deliberate row-scope policy for
+  writes.
 
 ## Create and call
 
-Source-derived, unexecuted example for an isolated database with `books(id,title)`, a project resource `db`, script-free endpoint and a real project authorizer called `public`:
+Source-derived, unexecuted example: an isolated database has
+`books(id,title)`, the project resource is `db`, and the public authorizer is
+actually named `public`:
 
 ```http
 POST /projects/demo/endpoints
@@ -23,41 +39,82 @@ Authorization: Bearer <console-token>
 {"segment":"books","method":"GET","crud_resource_name":"db","crud_config":{"table":"books","op":"list","columns":["id","title"],"filters":{"title":{"column":"title","op":"ilike"}},"order_by":[{"column":"id","dir":"asc"}],"limit":{"default":50,"max":200}},"allowed_authorizers":["public"]}
 ```
 
-Read back `GET …/endpoints/<id>`: the normal endpoint view includes `crud_resource_name:"db"`, `crud_config` containing the submitted object, `method:"GET"`, `path:"/books"`, `script_name:null`, `workflow_name:null`, and no published snapshot yet. Publish with `POST …/endpoints/<id>/publish {}` before calling `/p/demo/books?title=%25guide%25&limit=20&offset=0`. Response data comes from the real table; an empty list is not an authorization error. See [HTTP](http.md) for the complete endpoint view and shared fields.
+`GET …/endpoints/<id>` returns the ordinary endpoint view containing
+`crud_resource_name:"db"`, the submitted `crud_config`, `method:"GET"`,
+`path:"/books"`, `script_name:null`/`workflow_name:null`, and initially no
+published snapshot. Flow: `POST …/endpoints/<id>/publish {}` → call
+`/p/demo/books?title=%25guide%25&limit=20&offset=0`. Data comes from the
+real table — **an empty list is not an authorization error**. Full endpoint
+view and shared fields: [HTTP](http.md).
 
-| Operation | Method | Required path | Result |
+| Operation | Method | Path requirement | Result |
 | --- | --- | --- | --- |
-| `list` | GET | Collection | Array of selected rows. |
-| `get_by_pk` | GET | Every primary-key column as a same-named `:column` parameter | Row, or 404. |
-| `insert` | POST | Collection | Inserted selected row. |
-| `update_by_pk` | PATCH | Every primary-key column | Updated row, or 404. |
-| `delete_by_pk` | DELETE | Every primary-key column | Deleted row, or 404. |
+| `list` | GET | collection | Array of rows with the chosen columns. |
+| `get_by_pk` | GET | one `:column` per primary-key column | One row or 404. |
+| `insert` | POST | collection | The inserted row, chosen columns. |
+| `update_by_pk` | PATCH | all primary-key columns | Updated row or 404. |
+| `delete_by_pk` | DELETE | all primary-key columns | Deleted row or 404. |
 
-For example a successful list body is `[{"id":1,"title":"A guide"}]`; a get/update/delete result is the single selected row, not that one-element array. Key types are frozen from schema and coerced at dispatch. Use `path_override`/tree branches for `/books/:id`; composite keys require all key names. No key means key operations cannot publish.
+A successful list body looks like `[{"id":1,"title":"A guide"}]`;
+get/update/delete return a single row object, not a one-element array.
+Primary-key types are frozen from the schema and coerced at dispatch. Build
+`/books/:id` with tree branches or `path_override`; composite keys need every
+key column named, and key operations cannot publish for keyless tables.
 
-## Complete `crud_config`
+## The full `crud_config`
 
-Unknown top-level config keys are rejected. `table` and `op` are required; remaining fields default as follows:
+Unknown top-level config fields are rejected. `table` and `op` are required;
+the rest default as follows.
 
 | Field | Default and rules |
 | --- | --- |
-| `columns` | `[]`: all mapped columns; otherwise response allowlist. Avoid accidentally exposing newly mapped sensitive columns. |
-| `filters` | `{}`; list-only query-name → `{column,op:"eq"}`. Operators `eq,neq,gt,gte,lt,lte,like,ilike`; scalar values only, no `in` or null operator. Unknown query parameters are rejected rather than ignored. |
-| `order_by` | `[]`; list-only fixed array `{column,dir:"asc"|"desc"}`. No caller-selected sort. Without a fixed order, pagination is not stable. |
-| `limit` | Omitted/null uses `{default:50,max:200}`. Caller `limit` is clamped to max; `offset` is pagination offset. No unlimited spelling. |
-| `writable` | `[]`: all mapped non-PK columns for insert/update; explicit list narrows it. Unknown/non-writable body columns are refused, not ignored. Omitted fields are not automatically set to null; SQL null must satisfy the column/schema. |
-| `defaults` | `{}`; server-filled column → `$identity`, `$principal`, `$user_id`, `$role`, `$authorizer`, `$project_id`, `$claim.<name>`. Cannot overlap `writable`; callers cannot provide these columns. Unresolvable values refuse the write rather than inserting null. |
-| `authz_type` | Omitted/null inherits the resource's table binding. Explicit type uses `read` for list/get, `create` for insert, `update` and `delete`. Its action must exist. Inherited `authz_tables` bindings may remap actions. No granting rule means no visible/writable rows. |
-| `allow_unscoped_writes` | `false`; mutations need explicit `authz_type` or the resource's `authz_tables` binding, otherwise publish is refused. `true` is a deliberate full-table escape hatch, not automatic authorization. |
+| `columns` | `[]` = every mapped column; otherwise a response allowlist. **Note: newly mapped sensitive columns can become exposed by default later.** |
+| `filters` | `{}`; list only. Query name → `{column,op:"eq"}`; supports `eq,neq,gt,gte,lt,lte,like,ilike`; scalars only, no `in` or null operators; unknown queries are **rejected**, not ignored. |
+| `order_by` | `[]`; list only. A fixed `{column,dir:"asc"\|"desc"}` array; callers never choose ordering; without a fixed order, pagination is unstable. |
+| `limit` | Omitted/null uses `{default:50,max:200}`; caller limits clamp to max; `offset` paginates; there is no "unlimited" form. |
+| `writable` | `[]` = all mapped non-key columns; an explicit list narrows writes; unknown or non-writable body columns are rejected. Omitted fields are **not** auto-nulled; SQL nulls must still satisfy table constraints/schema. |
+| `defaults` | `{}`; platform-filled columns → `$identity`, `$principal`, `$user_id`, `$role`, `$authorizer`, `$project_id`, `$claim.<name>`; must not overlap `writable` and callers cannot submit them; unresolvable values are rejected and **null is never written**. |
+| `authz_type` | Omitted/null inherits the resource's table binding; an explicit type maps list/get to `read` and insert to `create`, plus `update` and `delete`, whose actions must exist; inherited authz_tables can remap actions. **Without an allow rule, rows are neither visible nor writable.** |
+| `allow_unscoped_writes` | Default false; mutating operations need an authz_type or resource authz_tables binding or publishing refuses; true is a deliberate whole-table escape hatch, **not** automatic authorization. |
 
-Save `PUT …/endpoints/<id>/info {"crud_config":{…}}` replaces the whole config; omission/null keeps it, not clears it. Resource target kind is not changed by replacing config. Publish validates operation/method, table/column/filter/order/PK compatibility and freezes resolved column types. Resource credentials, authorization bindings and rule model remain live: scope edits/rotation can affect existing snapshots. The runtime rechecks scope so removing a resource scope is not an implicit unscoped-write permission. Underlying schema drift may cause engine errors; refresh schema, review contract and republish rather than changing a frozen snapshot.
+`PUT …/endpoints/<id>/info {"crud_config":{…}}` replaces the config wholesale
+(omitted/null keeps rather than clears); replacement never changes the target
+resource kind. Publishing validates method/operation and
+table/column/filter/order/key compatibility, then freezes the resolved types.
+**Resource credentials, authorization bindings and rules stay live** —
+rotating credentials or changing scope affects calls without republishing;
+scope is re-checked at runtime, and removing a scope never silently opens
+unscoped writes. Underlying schema drift can surface as engine errors:
+refresh the schema, re-review the contract and republish — historical
+snapshots are never modified.
 
 ## Limits, recovery and cleanup
 
-Body and query binding use the HTTP dispatch contract; generated CRUD validation then restricts accepted arguments. Mutations use platform-managed credentials and auditing/reason policy. CRUD is synchronous: no script hooks, arbitrary joins, multipart upload, workflow target or arbitrary SQL, and no async execution. GET cache is supported **per caller only**; writes do not automatically purge cached reads. Authenticated mutations support dispatch idempotency, but still use a database/business uniqueness key against duplicate inserts.
+- body/query binds through the HTTP contract first, then CRUD parameter
+  restrictions apply; resource credentials and audit-reason policy are
+  platform-imposed.
+- CRUD executes synchronously: no script hooks, arbitrary joins, multipart,
+  workflow targets, arbitrary SQL or async.
+- GET supports **caller-scope** caching only; writes do not auto-invalidate.
+  Authenticated mutations get dispatch idempotency protection, but inserts
+  still need business/database unique keys.
 
-Verify with isolated fixtures covering unknown filters, wrong key types, missing rows, two tenants and rejected writes. A 404 can intentionally conceal an out-of-scope row; do not retry it as a transient failure. An engine/schema error requires checking resource health/schema and logs. Timeout or lost response may follow a committed mutation: inspect by business key before retrying. Disable callers by unpublishing, drain/account for in-flight writes, then delete the isolated endpoint and test table. Deleting an endpoint does not undo rows already written.
+Verify on an isolated fixture: unknown filters, wrong keys, missing rows, two
+tenants, denied writes. **A 404 can deliberately hide an unauthorized row —
+never retry it as a transient error.** For engine/schema errors, check
+resource health, schema and logs. A change may have committed before a
+timeout/lost response — query by business key before retrying. Cleanup order:
+unpublish to stop new calls → drain in-flight writes → delete the isolated
+endpoint and test tables; **deleting the endpoint undoes no historical
+writes**.
 
-Repo entry is an endpoint YAML with `target:{kind:crud,ref:db,config:{…}}`, mirrored by `viat pull/push`; use [CLI endpoint](../cli/endpoint.md) for available commands. There is no separate invented `viat crud` command.
+Repository side: endpoint YAML uses `target:{kind:crud,ref:db,config:{…}}`
+synced by `viat pull/push`; commands live in [CLI endpoint](../cli/endpoint.md)
+— there is no standalone `viat crud` command.
 
-Maintenance evidence: `crates/viat-core/src/types/crud.rs`; `crates/viat-api/src/handlers/endpoints.rs`, `handlers/snapshots.rs`, `crud_dispatch.rs`; runtime CRUD dispatch and its tests. Examples are source-derived/unexecuted; no database/provider operation was performed.
+## Verification basis
+
+Contract source `03751a67`: `crates/viat-core/src/types/crud.rs`;
+`crates/viat-api/src/handlers/endpoints.rs`, `handlers/snapshots.rs`,
+`crud_dispatch.rs`; the runtime CRUD dispatch and tests. Examples are
+source-derived and unexecuted; no database or provider service was touched.

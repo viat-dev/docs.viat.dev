@@ -126,6 +126,10 @@ viat resource delete ha_settings
 
 ## 参考与剩余前提
 
-[HTTP 资源](../assets/resources/http_api.md)、[脚本上下文](../assets/scripts/context.md)、[端点绑定](../triggers/http.md)、[认证](../auth/endpoints.md)、[仓库同步](../projects/repo-sync.md)。维护证据：固定版本产品的 `crates/viat-runtime/src/{python,resources_json}.rs`、`crates/viat-cli/src/repo/endpoints.rs`、`crates/viat-api/src/lib.rs` 注册处理器。
+[HTTP 资源](../assets/resources/http_api.md)、[脚本上下文](../assets/scripts/context.md)、[端点绑定](../triggers/http.md)、[认证](../auth/endpoints.md)、[仓库同步](../projects/repo-sync.md)。
 
 仍需实际准备：获准 HA 地址/CA/路由、安全保存的 token、真实隔离实体 ID、已激活项目用户 UUID 与登录、设备授权及人工集成验证。离线单元测试不是连接器或设备覆盖证明。
+
+## 核验依据
+
+维护证据：固定版本产品的 `crates/viat-runtime/src/{python,resources_json}.rs`、`crates/viat-cli/src/repo/endpoints.rs`、`crates/viat-api/src/lib.rs` 注册处理器。

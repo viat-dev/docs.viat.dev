@@ -364,7 +364,7 @@ viat p-user update demo_user --display-name 'Demo Renamed' --meta '{"demo":true}
 
 **失败处理、验证与清理。** JSON/邮箱/电话无效失败。电话可用常见符号及 5–20 位数字；校验邮箱形状。保存旧资料再逐字段恢复；list/API 验证。
 
-## 实现核对依据
+## 核验依据
 
 语法来自固定 Clap 合同与 main.rs；行为/权限核对以下源文件，路径相对产品仓库根。
 

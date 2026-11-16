@@ -1,65 +1,107 @@
 ---
-title: Activate or renew an instance
-description: Apply a valid code to the matching official image, inspect activation state, and diagnose failures without generating vendor keys.
+title: Activate and renew an instance
+description: Apply a valid activation code matching the official image, read the status and handle failures; vendor key generation is out of scope.
 doc_id: instance.activation
 verified_release: '1.1.0'
 channel: stable
 ---
 
-# Activate or renew an instance
+# Activate and renew an instance
 
-An official Viat deployment starts but keeps protected product routes locked until it has a valid activation code. This page assumes you **already have a valid code matching the official image's verification key**. It does not invent a purchasing/issuance URL, describe vendor signing-key generation, or treat a self-generated code as customer activation.
+An official Viat deployment boots, but protected product routes stay locked
+until a valid activation code is submitted. This page assumes you **already
+hold a valid code matching the official image's built-in verifying key**; it
+invents no purchase/issuance URL, describes no vendor key generation, and
+never presents a self-signed code as a customer activation path.
+
+After signing in, the console routes an unactivated deployment straight to
+the activation page:
+
+![Activation page of an unactivated instance](/screenshots/en/activation.png)
 
 ## Prerequisites and permissions
 
-- A running instance with its PostgreSQL database and required server secrets configured. Use [Docker Compose](../installation/docker-compose.md) for a new installation.
-- A valid, unexpired activation code for this server build. Verification is offline against the public key compiled into the server; a code signed by another key will not work.
-- A **platform `admin` or `owner`** session to apply a code. Project ownership alone is insufficient. Any authenticated platform user may read status.
-- Correct server time. An authentic code can still be expired according to the server clock.
+- A running instance with the PostgreSQL platform database and required
+  secrets configured; fresh installs start at
+  [Docker Compose](../installation/docker-compose.md).
+- A valid, unexpired code for this server build. Verification is offline
+  against the key compiled into the server; codes signed by any other key are
+  rejected.
+- Applying a code needs a **platform `admin` or `owner`** session; project
+  Owner is not enough. Any authenticated platform user can read the status.
+- Correct server time — an authentically signed code can still be expired by
+  the server's clock.
 
-For unattended initialization, `VIAT_DEFAULT_ADMIN_EMAIL` and `VIAT_DEFAULT_ADMIN_PASSWORD` seed the first platform Owner. Both are needed; an existing account is not overwritten. You do not need to turn public registration on just to create an administrator.
+Unattended initialization can bootstrap the first platform Owner via
+`VIAT_DEFAULT_ADMIN_EMAIL` and `VIAT_DEFAULT_ADMIN_PASSWORD`; both are
+required, existing accounts are never overwritten, and public registration
+stays off.
 
-## What remains reachable while locked
+## What stays reachable while locked
 
-The activation gate exempts the root redirect, console bundle (`/ui` and descendants), platform authentication (`/auth` and descendants), license endpoints (`/license` and descendants), embedded book (`/_docs` and descendants), `/healthz`, `/readyz`, `/metrics`, and `/version`.
+The activation gate exempts: the root redirect, console static content
+(`/ui` and below), platform authentication (`/auth`), activation endpoints
+(`/license`), the built-in handbook (`/_docs`), `/healthz`, `/readyz`,
+`/metrics` and `/version`.
 
-**Gate exemption is not anonymous authorization.** `GET /license` and `/version` still require a platform login, and other routes retain their own authentication/configuration. `GET /healthz` can return `200` on an unactivated or expired instance; it is a liveness probe, not a license check. Most project/product routes return:
+**Exemption is not anonymous authorization**: `GET /license` and `GET /version`
+still require a platform login, and a `200` from `/healthz` only proves the
+process lives — it is not a license check. Most project/product routes
+answer:
 
 ```json
 {"error":"license_required","message":"license_required: this deployment has not been activated; an administrator must submit an activation code"}
 ```
 
-The HTTP status is `403`. Expired-state messages describe expiration instead. Background execution paths also enforce activation; leaving the process alive does not mean locked schedules continue running.
+with HTTP status `403`. Background execution obeys the same gate; a live
+process does not mean locked schedules keep running.
 
-## Option A: use the console
+## Submitting the code
 
-1. Open the instance's `/ui/` and sign in with a platform Admin/Owner account.
-2. On the activation page, paste the valid code exactly as supplied.
-3. Submit it. Success installs the code and exposes its status/customer/expiry information; normal project navigation becomes available.
-4. If another server process still appears locked, allow up to approximately **15 seconds** for a locked node's database recheck, then retry. The code is stored in the shared platform database, not in one browser.
+Pick one of the three ways — the effect is identical, and renewing is just
+submitting the new code the same way.
 
-Do not publish the code or customer/license identifiers in screenshots or support posts.
+:::tabs id=activate
 
-## Option B: use the CLI
+::tab Console
 
-Use a matching CLI, and complete the login procedure in [Platform users](platform-users.md) first. No project needs to be selected.
+1. Open the instance's `/ui/` and sign in as a platform Admin/Owner; an
+   unactivated deployment lands on the activation page automatically.
+2. Paste the complete code into the input and submit.
+3. On success the page shows status, customer and expiry, and normal project
+   navigation returns.
+4. If other server processes stay locked briefly, retry after the ~**15
+   second** database re-check window — the code lives in the shared platform
+   database, not in a browser.
 
-Read status:
+![License status page of an activated instance](/screenshots/en/license.png)
+
+::tab CLI
+
+Complete the sign-in from [platform users](platform-users.md) first; no
+project selection needed.
+
+Read the status:
 
 ```sh
 viat license show
 viat license show --json
 ```
 
-A never-activated instance returns exactly this minimal JSON shape:
+An unactivated instance returns the minimal shape:
 
 ```json
 {"activated":false,"expired":false}
 ```
 
-An installed code returns `activated: true` plus `expired`, `license_id`, `customer`, `issued_at`, `expires_at`, and `activated_at`. `expires_at: null` means no expiry date; `activated: true` alone is **not** sufficient—an installed expired code is still reported as activated with `expired: true`.
+With a code installed you get `activated: true` plus `expired`, `license_id`,
+`customer`, `issued_at`, `expires_at`, `activated_at`. **`activated: true`
+alone is not enough**: an installed-but-expired code still reports
+`activated: true` alongside `expired: true`; `expires_at: null` means no
+expiry date.
 
-To keep the code out of command arguments and shell history, place it in a protected file you received/prepared privately, then use stdin:
+To keep the code out of argument lists and shell history, store it in a
+protected file and submit via stdin:
 
 ```sh
 chmod 600 activation-code.txt
@@ -67,51 +109,77 @@ viat license activate - --json < activation-code.txt
 viat license show --json
 ```
 
-`-` is a literal positional argument meaning “read code from stdin,” not an omitted argument. The CLI trims whitespace and refuses an empty input locally. Expected successful state is `activated: true` and `expired: false`; the non-JSON command also prints `activated.` and a status summary. Treat displayed identifiers as private.
+`-` is the literal positional meaning "read the code from stdin" — it is not
+an omitted argument. The CLI trims whitespace and rejects empty input
+locally; success shows `activated: true`, `expired: false`. Treat printed
+identifiers as private.
 
-The equivalent management operation is `POST /license/activate` with JSON `{"code":"..."}` using a platform Admin/Owner credential. Specific code refusals are HTTP `400` with the normal `error: "bad_request"`; their reason appears in `message`, not as a new top-level error value.
+::tab Automatic activation at startup
 
-## Option C: activate at startup
-
-Set `VIAT_LICENSE_CODE` in the protected server environment. For the [Compose example](../installation/docker-compose.md), edit the private `.env` and recreate only the app service:
+Set `VIAT_LICENSE_CODE` in a protected server environment (for Compose, the
+private `.env`) and recreate only the app service:
 
 ```sh
 docker compose up -d viat
 ```
 
-Verify through the console or `viat license show --json`; a successful container start alone does not prove the code was accepted. Startup handling is deliberately non-destructive:
+Verify via the console or `viat license show --json`. Startup handling
+deliberately never destroys existing state:
 
-- Unset/blank value: no change.
-- Malformed, incorrectly signed, unsupported, or expired value: log and ignore; startup still proceeds.
-- No usable stored code: install a valid supplied code.
-- A valid code is already stored: replace it only when the environment code lasts **strictly longer**. A permanent code outranks a dated code; an old `.env` must not undo a later renewal.
+- Unset/empty: nothing changes.
+- Malformed, wrong signature, unsupported or expired: logged and ignored;
+  startup continues.
+- No usable installed code: the provided valid code is installed.
+- Valid code already installed: replaced only when the environment value is
+  **strictly longer-lived** (a permanent code outranks a dated one); an old
+  `.env` never reverts a later renewal.
 
-All replicas may use the same environment value and shared database. These startup rules differ from an explicit activation request: the manual endpoint installs the submitted valid code, so check its expiry before deliberately replacing a longer code.
+All replicas can share one environment variable and database; the manual
+endpoint installs any valid submitted code, so compare validity windows
+before replacing a longer-lived code.
 
-## Renewal and failure handling
+:::
 
-Renewal uses the same UI, CLI command, or startup variable with a newly supplied valid code. No network activation service or local vendor private key is required. Removing the environment variable does not erase a code already stored in the platform database.
+## Handling failures
 
-| Symptom / message reason | Meaning and next action |
+| Symptom / message cause | Meaning and action |
 | --- | --- |
-| `no activation code supplied` | CLI stdin/file is empty; check the protected input file |
-| `invalid_code: ... malformed` | Truncated or incorrectly formatted input; re-copy the complete supplied code |
-| `invalid_code: ... signature does not verify` | Code does not match the image's compiled verification key; confirm artifact/code pairing with your distributor |
-| `unsupported_code: ...` | Authentic code format/version is newer than the server understands; use a compatible server/code pair |
-| `expired_code: ...` | Code has expired; check server time and use a current valid renewal |
-| HTTP `401` | Sign in with a platform account; a public endpoint credential is not enough |
-| HTTP `403` applying a code | Check platform Admin/Owner role, not project role |
-| Startup succeeds but still locked | Invalid environment codes are ignored; read status and restricted server logs |
-| A peer remains locked briefly | Check shared database and allow the locked-node recheck interval; inspect errors if it persists |
+| `no activation code supplied` | CLI stdin/file was empty; check the protected input file |
+| `invalid_code: ... malformed` | Input truncated or malformed; recopy the complete code |
+| `invalid_code: ... signature does not verify` | Code does not match the image's compiled key; confirm the artifact/code pair with your distributor |
+| `unsupported_code: ...` | The code's format/version is newer than this server supports; use a compatible server/code pair |
+| `expired_code: ...` | Expired; check the server clock and use a current renewal code |
+| HTTP `401` | Sign in as a platform account; endpoint credentials are not enough |
+| HTTP `403` when submitting | Check the platform Admin/Owner role; project roles do not apply |
+| Startup succeeded but still locked | An invalid environment code is ignored; check status and server logs |
+| Other nodes briefly locked | Check the shared database and wait out the re-check window; investigate if it persists |
 
-Do not “fix” signature failure by replacing the server's verification key, generating customer-side vendor keys, or weakening the gate. Those change the trust model rather than activating the official deployment.
+The equivalent management operation is `POST /license/activate` with
+`{"code":"..."}` as a platform Admin/Owner; rejections are HTTP `400` with the
+plain `error: "bad_request"` and the reason in `message` — not a new
+top-level error value.
+
+> [!WARNING]
+> Never "fix" signature failures by swapping the server's verifying key,
+> generating vendor keys customer-side or weakening the gate — that changes
+> the trust model instead of activating an official deployment.
 
 ## Verification and cleanup
 
-Confirm `activated: true`, `expired: false`, then open a project you actually belong to. A project permission refusal after activation is a separate access issue. Keep the original code in your protected configuration/records; if you created a temporary plaintext input file, remove it according to your host's secret-handling policy. Deleting a file is not guaranteed secure erasure on SSDs or backed-up filesystems.
+After `activated: true` and `expired: false`, open a project you actually
+joined — post-activation project permission denials are a separate class of
+problem. Keep the original code in protected storage; remove any temporary
+plaintext input file per your host's secret policy (deletion is not secure
+erasure on SSDs and backed-up filesystems).
 
-Activation state is persisted with the platform database. Backups/restores and master-key management still need their own operational plan; activation is not a backup mechanism and does not create project memberships.
+Activation persists with the platform database. Backup restores and master
+key management remain separate operations; activation is not a backup
+mechanism and creates no project memberships. Never publish the code,
+customer name or license identifiers in screenshots or support posts.
 
 ## Verification basis
 
-Contract source `03751a67`: `crates/viat-api/src/license.rs` (`open_path`, `adopt_env_code`, reload interval), `crates/viat-api/src/handlers/license.rs` (permissions, status/errors), and `crates/viat-cli/src/commands/license.rs` (stdin and output).
+Contract source `03751a67`: `crates/viat-api/src/license.rs` (`open_path`,
+`adopt_env_code`, re-check interval), `crates/viat-api/src/handlers/license.rs`
+(permissions, status and errors), `crates/viat-cli/src/commands/license.rs`
+(stdin and output).

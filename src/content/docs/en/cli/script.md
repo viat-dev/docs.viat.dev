@@ -405,7 +405,7 @@ viat script upload demo_binary --binary ./demo-worker --target linux/x86_64
 
 **Failure handling, verification and cleanup.** Requires server upload enabled, compatible executable format and a binary manifest script. Wrong language/empty file/unsupported target fails. Inspect script show/build, publish intentionally; restore previous manifest and artifact for rollback (bytes are not retrieved by show).
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

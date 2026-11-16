@@ -166,7 +166,7 @@ viat tree update demo_tree --name demo_tree_renamed
 
 **Failure handling, verification and cleanup.** Name/path collisions refuse; keep original values and restore via update. Verify tree show plus endpoint list; changes to served snapshots require the appropriate publish operation.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

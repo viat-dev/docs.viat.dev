@@ -10,3 +10,6 @@ exports/
 .DS_Store
 __pycache__/
 *.py[cod]
+.claude/settings.local.json
+permissions.local.json
+.viat/

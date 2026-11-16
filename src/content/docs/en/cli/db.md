@@ -147,7 +147,7 @@ viat db status demo_db
 
 **Failure handling, verification and cleanup.** Needs readable SQL files and reachable existing resource DB. Ledger reads never create the ledger table; a database with no prior migration returns an empty ledger. Restore changed applied files; add a new corrective migration, never edit applied history. No destructive cleanup is automatic.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

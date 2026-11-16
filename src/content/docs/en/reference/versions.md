@@ -8,61 +8,104 @@ channel: stable
 
 # Versions, provenance and compatibility
 
-A version string, a Git revision and a built artifact answer different questions. Check all applicable identities before using a command, changing a deployment or interpreting a sample response.
+A version string, a Git revision and a built artifact answer **different
+questions**. Check every applicable identity before using a command,
+changing a deployment or interpreting a sample response — never a
+single version string.
 
-## This edition's baseline
+## This manual's baselines
 
-| Surface | Baseline | What it establishes |
+| Surface | Baseline | What it tells you |
 | --- | --- | --- |
-| Server and CLI | `1.1.0`, release source `fd340879076a87c2662c454788178eecb05d0036` | Published product behavior targeted by stable pages. |
-| Inspected main source | `03751a679ed0205505ab9fae5207a66189c47a18` | The source inspected for the documentation contract, including subsequent release-tooling work. Main is not a new published server image. |
-| Native client | `0.1.0`, independent version line | App marketing version; not a declaration that its server or bundled CLI is version 0.1.0. Build number, architecture and distribution channel also matter. |
-| Documentation | `contracts/manifest.json` | Edition, inspected/released source, contract digests, dirty/candidate state and publication readiness. |
-| APNs Widget snapshots | Unreleased preview work, not server 1.1.0 | Must not be used as a stable installation prerequisite or promised intranet refresh path. |
+| Server and CLI | `1.1.0`, release source `fd340879076a87c2662c454788178eecb05d0036` | The **released** product behavior stable pages target |
+| Verified main source | `03751a679ed0205505ab9fae5207a66189c47a18` | The source the documentation contracts were verified against (including later release tooling); main is **not** another released server image |
+| Native client | `0.1.0`, an independent version line | The app's marketing version — **not** a claim that the server or bundled CLI is 0.1.0; build number, architecture and distribution channel matter too |
+| Documentation | `contracts/manifest.json` | Manual version, verified/release sources, contract digests, dirty/candidate state and publication readiness |
+| APNs Widget snapshot | Unreleased preview work outside server 1.1.0 | **Cannot** be a stable installation prerequisite or a promised stable intranet refresh path |
 
-The documentation reconstruction remains a **preview** until its coverage and acceptance gates pass. A page marked `channel: stable` describes released capabilities; that flag does not claim the entire new handbook is already a complete published release. Likewise, `source_dirty: true` and `review_status: candidate` must not be rewritten as a clean reviewed export merely to pass a deployment check.
+Until coverage and acceptance gates pass, the new manual remains a
+**reconstruction preview**. A page marked `channel: stable` describes
+released capability — it **does not mean** the whole new manual is
+formally released. Likewise, `source_dirty: true` and
+`review_status: candidate` are **never** flipped to clean-and-reviewed
+merely to pass a deployment check.
 
-## Check the installed components
+## Checking installed components
 
 ```sh
 viat --version
 viat version
 ```
 
-`--version` is local. `version` also attempts to read the signed-in server's authenticated `/version` response. A local success does not establish server connectivity or authentication. The server response is shaped as:
+- `--version` inspects only the local binary; `version` additionally
+  reads the signed-in server's authenticated `/version`. Local success
+  **proves no** server network/auth validity. The server response
+  shape:
 
 ```json
 {"version":"1.1.0"}
 ```
 
-This is an illustrative response for the target release, not a guarantee that your selected instance runs it. `/healthz` deliberately does not expose a version; do not use a successful probe to infer release identity. See [CLI utilities](../cli/utilities.md) for exact output/error behavior.
-
-For a native artifact, retain the supplied release metadata and digest together with the DMG/IPA. Check the app version, build number, architecture/channel and bundled CLI version. An iOS device-development artifact, registered-device distribution and App Store Connect artifact have different signing/install requirements; renaming the file cannot change its channel.
+  An illustration of the target release — **not** a guarantee the
+  currently selected instance runs it. `/healthz` deliberately exposes
+  no version: probe success **infers no** release identity. Exact
+  output and error behavior: [CLI general commands](../cli/utilities.md).
+- Native artifacts should be kept together with their release metadata
+  and digests; verify the app version, build number,
+  architecture/channel and bundled CLI version. iOS development-device,
+  registered-device and App Store Connect artifacts have different
+  signature/installation requirements — **renaming a file changes no
+  distribution channel**.
 
 ## Compatibility rules
 
-- Use the matching documentation edition for the running server, not whichever website page is newest.
-- CLI, `viat-test-host` and `viat-endpoint-test-host` must match for local test-host protocols. Installing the CLI alone does not install Python, Bun or a Rust build toolchain.
-- Resource schemas describe shape, not every conditional API rule. A type accepted in current source is not evidence that an older running server supports it.
-- Management API/console types and project-endpoint OpenAPI are different contracts. Generated endpoint OpenAPI does not document the whole management API.
-- A source checkout with Cargo version 1.1.0 can contain unpublished changes. Verify its commit and artifact provenance before treating new behavior as available.
-- A published endpoint snapshot freezes endpoint/target state, not every external dependency or credential. Workflow-step `uses:` resolution has a live dependency exception; read [Concepts](../overview/concepts.md).
-- Rebuilding or rolling back an endpoint does not roll back database migrations, external systems, resource credentials or shared live dependencies.
+- Use the manual version matching the **running server**, not merely
+  the newest website pages.
+- The local test-host protocol requires the CLI, `viat-test-host` and
+  `viat-endpoint-test-host` to **match each other**; installing the CLI
+  alone installs no Python, Bun or Rust build toolchain.
+- Resource schemas describe structure and **do not cover** every
+  conditional API rule; current source supporting a kind does not mean
+  an older running server does.
+- Management API/console types and project endpoint OpenAPI are
+  **different contracts**; the generated endpoint OpenAPI does not
+  describe the whole management API.
+- A checkout whose Cargo version still reads 1.1.0 may already contain
+  unreleased changes — verify commits and artifact provenance before
+  relying on new behavior.
+- An endpoint snapshot pins endpoint/target state and **pins no**
+  external dependencies or credentials; workflow-step `uses:` keeps its
+  live-resolution exception, see [core concepts](../overview/concepts.md).
+- Rebuilding or rolling back an endpoint **rolls back no** database
+  migrations, external systems, resource credentials or shared live
+  dependencies.
 
 ## Updating contracts and documentation
 
-Maintainers export contracts from an explicitly chosen product checkout, import them as candidate inputs, review changes, update both languages and rerun examples. Resources, language inventory, CLI leaves and MCP tools have coverage checks; the checks do not replace behavioral review or provider/device acceptance.
+Maintainers export contracts from a deliberately chosen product
+checkout, import as candidate → review diffs → synchronize both
+languages → rerun the examples. Resources, language inventories, CLI
+leaf commands and MCP tools have coverage checks — but checks
+**replace neither** behavioral review nor provider/device acceptance.
 
-The raw Markdown link on each page carries the same version/channel metadata. Stable LLM indexes exclude preview-capability pages. The offline book is generated from the same Markdown and must be pinned to an accepted documentation artifact before replacing a shipped product book. It is not a live fetch from the latest website.
+Every page's raw Markdown carries the same version/channel information;
+the stable LLM index excludes preview-capability pages. The offline book
+is generated from the same Markdown; before replacing the product's
+bundled book it must be pinned to accepted documentation artifacts —
+**never** fetched from the newest website at startup.
 
 ## When versions disagree
 
-| Observation | Action |
+| Symptom | Action |
 | --- | --- |
-| CLI is newer than server | Consult that server's edition and verify each needed command/API; do not assume backwards compatibility for new fields. |
-| A local test host reports another version | Replace it with the CLI's matching host; do not bypass the handshake. |
-| Native app works but a feature is missing | Check platform, build/channel and server capability; app marketing version alone is insufficient. |
-| Main contains a feature absent from the release | Keep it preview-only until a matching artifact ships. |
-| Docs build succeeds but release check fails | Read missing coverage/evidence; a successful preview is not authorization to mark the manifest ready. |
+| CLI newer than the server | Read the **server's** matching manual and verify the commands/APIs you need; assume no backward compatibility of new fields |
+| Local test host reports another version | Swap in the CLI-matching host — never bypass the handshake |
+| Native app works but a feature is missing | Verify platform, build/channel and server capability; the app's marketing version is insufficient |
+| main has a feature, release artifacts do not | Keep it **preview** until matching artifacts actually ship |
+| Documentation build succeeds but the release check fails | Inspect coverage/evidence gaps; a successful preview is no reason to mark the manifest ready |
 
-This page records provenance, not an upgrade execution. Follow [installation](../installation/docker-compose.md), back up deployment state and validate a restore before a real upgrade. Do not alter DNS, publish an artifact or replace a running service solely because a documentation example mentions a newer revision.
+This page records provenance and **performs no upgrades**. Before a
+real upgrade, back up deployment state and verify recovery per the
+[installation instructions](../installation/docker-compose.md).
+**Never** change DNS, release artifacts or replace a running server
+merely because a documentation example mentions a newer commit.

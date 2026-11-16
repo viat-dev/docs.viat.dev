@@ -149,7 +149,7 @@ viat logs tail --json
 
 **Failure handling, verification and cleanup.** Ctrl-C stops only the local reader (signal exit status is not the 0/1 command convention). No replay on reconnect: query/show gaps separately. This does not cancel running scripts and needs no remote cleanup.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

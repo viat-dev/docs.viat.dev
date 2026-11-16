@@ -8,60 +8,123 @@ channel: stable
 
 # Configuration model and inventory
 
-This manual describes stable **1.1.0**, not a future release. Start with [Docker Compose installation](../installation/docker-compose.md) or [binary/source installation](../installation/binary-source.md), then choose the reference below. All commands in these configuration/operations chapters are **operator-reviewed templates, not commands executed during documentation authoring**. Replace example names and secrets, review effects, and validate in an isolated installation before production.
+This manual describes stable **1.1.0**. This page answers three questions:
+where a setting lives, who may change it, and how to verify the change. The
+full variable tables per topic (database/security/runtime/network/storage/
+observability/integrations) are reached through the index below.
+
+> [!WARNING]
+> Every command in the configuration and operations chapters is an
+> **operator-reviewed template, not something executed while authoring this
+> documentation**. Replace example names and secrets, review effects, and
+> validate in an isolated installation before production. First-time
+> deployments should start with [Docker Compose installation](../installation/docker-compose.md)
+> or [binary/source installation](../installation/binary-source.md).
 
 ## Configuration surfaces
 
-| Surface | Who changes it | Persistence and precedence |
+| Surface | Operator | Persistence and precedence |
 | --- | --- | --- |
-| Process environment | Host/container operator | Server has no general YAML configuration file or configuration-reload API. Explicit container/process environment overrides image `ENV`; missing values use the individual runtime defaults below. Restart/recreate to change it. |
-| Image and container | Docker administrator | Runtime image supplies interpreters/static assets and selected defaults. Compose `.env` is substitution input, **not automatic process environment**: the Compose service must forward each application variable. |
-| Deployment wrapper | Host operator | `deploy-server.sh` reads a shell `.env`, not a passive dotenv file. Only use a trusted file. Wrapper controls are not application settings; see [network](network.md). |
-| Instance settings | Platform Owner/Admin according to the setting | Stored in PostgreSQL; not a replacement for `DATABASE_URL`, master key, listener or worker configuration. |
-| Project/endpoint/resource | Project member with the corresponding write/publish permission | Stored live drafts and published snapshots differ. Endpoint authentication/bindings/overrides normally require publish; draft test runs do not prove the published route changed. |
-| CLI/MCP session | Local CLI user | `.viat/config.yaml` and client environment, not server knobs. See [integrations](integrations.md). |
+| Process environment | Host/container operations | No generic YAML config file and no unified reload API. Explicit process/container environment overrides image `ENV`; unset uses the actual runtime defaults in the tables; restart/recreate to apply. |
+| Image and container | Docker administrator | The image supplies interpreters, static files and some defaults. Compose `.env` is variable substitution only and is **not injected into the process** — the service's `environment` (or equivalent) must pass variables explicitly. |
+| Deployment wrapper scripts | Host operations | `deploy-server.sh` loads `.env` as a **shell script**, not passive dotenv — trusted files only; script variables ≠ application config, see [network configuration](network.md). |
+| Instance settings | Platform Owner/Admin with the right permission | Stored in PostgreSQL; they never replace database connection, master key, listener or worker configuration. |
+| Projects, endpoints, resources | Project members with edit/publish rights | Drafts ≠ published snapshots; endpoint auth/bindings/overrides usually need publishing — a passing draft test does not mean the route changed. |
+| CLI/MCP sessions | The local client user | `.viat/config.yaml` and the client environment — not server parameters, see [integrations](integrations.md). |
 
-There is no universal boolean parser. Use the spellings documented for each row: some switches recognize only literal lowercase `false`/`0`, some accept case-insensitive `no`, and positive opt-ins may require exactly `1`. A misspelled safety setting can leave the feature enabled.
+> [!NOTE]
+> Booleans have **no uniform parsing rule**: some switches accept only
+> lowercase `false`/`0`, some a case-insensitive `no`, and some enable-flags
+> require a literal `1`. A misspelled security switch can leave the feature
+> on — always verify after changing.
 
-## How to read every variable table
+## Conventions used in the variable tables
 
-Every row gives **type, actual binary default, units/range, validation/fallback, scope and override behavior**. Unless marked **required**, a variable is optional. Unless a row says otherwise, an explicit valid value replaces its binary default; invalid numbers fall back to the displayed default. “Unset” is not the same as an empty string. Integers described as `u64`, `u32`, `u16`, `usize` or `i64` use that Rust integer's representable range; only additional product bounds are shown. `usize` is platform-sized. Keep operational values comfortably below numeric extremes.
+Every entry states **type, the binary's actual default, unit/range,
+validation and fallback, scope and precedence**. Everything is optional
+unless marked **required**. Unless stated otherwise: a legal explicit value
+replaces the runtime default; numeric parse failures fall back to the listed
+default; "unset" is not an empty string. `u64`/`u32`/`u16`/`usize`/`i64`
+follow their Rust integer ranges (`usize` is platform-dependent), with
+additional product constraints listed — **never treat a theoretical maximum
+as an operable value**.
 
-Scope/reload codes used throughout:
+Scope and reload codes:
 
-- **S** — server startup/router construction; restart required.
-- **F** — cached on first use for the server process; restart required.
-- **D** — read when the indicated operation runs; no supported external mechanism mutates a running process's environment. Change the deployment environment and restart; this does **not** mean editing `.env` hot-reloads it.
-- **W** — worker/compile spawn; existing workers keep their environment. Restart/rebuild environments after changing it.
-- **C** — CLI/MCP invocation, not server. Rerun the client.
-- **I** — installer/Compose/build input, not server. Rerun/recreate only after reviewing its side effects.
+| Code | Meaning |
+| --- | --- |
+| **S** | Read at startup or route build; restart required. |
+| **F** | Cached in-process after first use; restart required. |
+| **D** | Read when the related operation executes; there is no generic way to mutate a running process's environment from outside — a deployment change still needs a restart, and **editing `.env` does not hot-reload**. |
+| **W** | Read when a worker/compile process is created; existing workers are unaffected; restart and rebuild the affected environments after changing. |
+| **C** | This CLI/MCP invocation only, nothing server-side; rerun the client. |
+| **I** | Installer/Compose/image-build input, not a server parameter; redeploy/rebuild after confirming effects. |
 
-A project or script override exists only where explicitly stated. A deployment ceiling cannot be raised by an endpoint author. In particular, execution budgets resolve target timeout → project default → deployment default, then clamp to the applicable sync/async ceiling. Build budgets and proxy timeouts are separate.
+Projects or scripts override only where explicitly noted; endpoint authors
+cannot break deployment ceilings. Execution timeouts pick "target declaration
+→ project default → deployment default" and then respect the sync/async
+caps; build budgets and proxy timeouts are separate parameters.
 
-## Complete reference by responsibility
+## Find your topic
 
-- [Database](database.md): required platform PostgreSQL, resource database limits, migration timeout and real TLS limitations.
-- [Security](security.md): keys, tokens, bootstrap, registration, MFA, worker identity, secret backends and SSRF switch.
-- [Runtime](runtime.md): pools, lanes, execution/build/queue budgets, schedules and Rust artifacts.
-- [Network and deployment](network.md): listener, public origin/prefix, TLS, console/docs, WebSockets, Compose and wrapper controls.
-- [Storage](storage.md): filesystem allowlists, spooling, S3 buffers/multipart and artifact persistence.
-- [Observability](observability.md): telemetry, metrics, line-log backends, history and retention settings.
-- [Integrations and client scope](integrations.md): SMTP, chat/social gateways, package managers, proxy/CA forwarding, CLI/MCP and development-only inputs.
+- [Database](database.md): platform PostgreSQL, resource connection limits,
+  migration timeouts and the real TLS limits.
+- [Security](security.md): keys, tokens, bootstrap accounts, registration,
+  MFA, worker identity, secret backends and SSRF switches.
+- [Runtime](runtime.md): pools, execution lanes, run/build/queue budgets,
+  scheduling and Rust artifacts.
+- [Network and deployment](network.md): listeners, public URL and prefixes,
+  TLS, console/built-in docs, WebSocket, Compose and deployment scripts.
+- [Storage](storage.md): directory allowlists, upload staging, S3
+  buffering/multipart and artifact persistence.
+- [Observability](observability.md): logs, metrics, tracing, line-log
+  backends, history and retention.
+- [Integrations and clients](integrations.md): SMTP, chat/social gateways,
+  package managers, proxy/CA passthrough, CLI/MCP and dev-only inputs.
 
-## Apply and verify a change
+## Change, verify, recover
 
-1. Record the running version/image digest, effective deployment file, current mounts and the reason for the change. Keep secret values out of tickets and process listings.
-2. Check the applicable row, including Docker versus binary defaults and per-node versus shared scope. On a fleet, use consistent keys, public URL and backend selection.
-3. Back up before migrations, key/backend changes or shorter retention; follow [backup and restore](../operations/backup-restore.md). Do not “rotate” the master key by replacing its environment variable.
-4. Edit the actual service environment. A newly added line in Compose `.env` alone does nothing unless the service forwards it. In a system service, use the service manager's environment mechanism; the binary itself does not load `.env`.
-5. Restart gracefully and inspect startup logs. Startup connects to PostgreSQL with a 10-connection pool, applies bundled migrations, seeds an initial Owner if configured, initializes backends and starts background loops before serving.
-6. Check `/healthz`, `/readyz`, authenticated `/version`, login, and one isolated project request. A healthy probe does not prove activation, dependencies, external credentials or notification delivery.
-7. If behavior is wrong, restore the previous non-destructive setting and restart. Database migration rollback and deleted retention data require the recovery procedure, not merely an older image.
+1. Record the current version, image digest, deployment files, mounts and
+   the reason for the change; **never put secret values into tickets or
+   process command lines**.
+2. Check the item's Docker/binary differences and its single-node vs shared
+   scope; keys, public URLs and backend choices must agree across nodes.
+3. Before migrations, key/backend changes or retention reductions, complete
+   a [backup](../operations/backup-restore.md) — swapping the master key
+   directly is not a rotation procedure.
+4. Change the **actual service environment**: adding a line to Compose
+   `.env` without passing it into the service does nothing; system services
+   use the service manager's environment configuration; the binary itself
+   never loads `.env`.
+5. Restart gracefully and read the startup logs: startup builds the platform
+   database pool (capped at 10 connections), runs built-in migrations,
+   creates the initial Owner when needed, initializes backends, starts
+   background loops and then serves.
+6. Check `/healthz`, `/readyz`, the authenticated `/version`, sign-in and an
+   isolated project request — healthy probes **do not** prove activation,
+   dependencies, external credentials or notification delivery.
+7. On trouble, restore the previous non-destructive configuration and
+   restart; database migration rollbacks and deleted data go through the
+   recovery procedure — never merely swap back an old image.
 
-## Runtime defaults are not Docker defaults
+## Runtime defaults ≠ Docker defaults
 
-The binary allows registration when unset; the official image sets `VIAT_ALLOW_REGISTRATION=false`. The image also sets `VIAT_WEB_DIR=/app/web`, `VIAT_DOCS_DIR=/app/docs`, `VIAT_BIND=0.0.0.0:8080`, `VIAT_SHELL_BIN=/bin/bash`, `SCHEDULER_ENABLED=true`, `RUST_LOG=info`, and `HOME=/home/viat`. The `-build` image additionally sets Rust SDK/artifact/target and Cargo/rustup paths. A slim image has no Rust compiler even though the binary's build switch defaults on. Docker's example `4g` memory and `512` PID limits are container examples, **not application defaults or measured capacity**.
+The bare binary allows registration when unconfigured; the official image
+sets `VIAT_ALLOW_REGISTRATION=false`. The image also sets
+`VIAT_WEB_DIR=/app/web`, `VIAT_DOCS_DIR=/app/docs`,
+`VIAT_BIND=0.0.0.0:8080`, `VIAT_SHELL_BIN=/bin/bash`,
+`SCHEDULER_ENABLED=true`, `RUST_LOG=info` and `HOME=/home/viat`; `-build`
+images add the Rust SDK, artifact/target directories and Cargo/rustup paths.
+Ordinary images contain no Rust compiler even though the binary's build
+switch defaults on. The `4g` memory and `512` PID limits in the deployment
+example are **container examples — not application defaults and not measured
+capacity**.
 
-## Maintenance evidence
+## Verification basis
 
-Behavior was checked against the pinned implementation's `crates/viat-api/src/config.rs` (including `AppConfig::from_env`), startup, runtime pool/lane/Rust/worker settings, backend constructors, `Dockerfile`, Compose and deployment scripts. Environment strings used only in tests, injected worker context and build tools are explicitly classified in [integrations](integrations.md); they are not supported server toggles. No archived plan is used as a behavior contract.
+Contract source `03751a67`: `crates/viat-api/src/config.rs` (including
+`AppConfig::from_env`), the startup sequence, runtime pool/lane/Rust/account
+configuration, backend construction, the `Dockerfile`, Compose and
+deployment scripts. [Integrations](integrations.md) separately categorizes
+test-only, worker-injected and build-tool variables — they are not server
+switches. Archived plans are never evidence of current behavior.

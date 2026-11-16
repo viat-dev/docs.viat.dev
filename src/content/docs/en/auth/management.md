@@ -9,85 +9,167 @@ contract_ids: []
 
 # Management authentication and identity planes
 
-## Choose the correct identity
+## Pick the correct identity plane first
 
-Viat has three separate identity planes. An email appearing in two planes does not join them.
+Viat has three independent identity systems; the same email appearing in
+two of them **does not** link the accounts.
 
-| Plane | Account and credential | Authority |
+| Plane | Accounts and credentials | Permissions come from |
 | --- | --- | --- |
-| Platform account | Console/CLI account; platform access JWT, refresh token or `vis_pat_` PAT | Instance role and explicit project memberships |
-| Project collaborator | A platform account's membership in one project | Membership role `owner`, `admin`, `developer`, `operator` |
-| Project end user | Row in that project's user store; password/social/OIDC/JWT/API-key identity | Project business role, `is_admin`, authorization rules |
+| Platform account | Console/CLI user; platform access JWT, refresh token or `vis_pat_` PAT | Platform role + explicit project membership |
+| Project collaborator | A platform account's membership in one project | Member role `owner`/`admin`/`developer`/`operator` |
+| Project end user | A record in the project's user store; password/social/OIDC/JWT/API-key identities | Project business roles, `is_admin`, authorization rules |
 
-Platform roles and collaborator roles use the same four literals, but are separate assignments. Being a platform Owner does **not** manufacture membership in every project. Creating a project enrolls its creator as that project's Owner. A project end user with `is_admin: true` is not a console administrator and cannot edit scripts through `/projects/...`.
+Platform and member roles reuse the **same four values but are granted
+separately**. A platform Owner is **not** automatically a member of every
+project; the project creator becomes that project's Owner; a project
+user's `is_admin: true` means **no** console administrator and cannot
+edit scripts via `/projects/...`.
 
-Use [project collaboration](../projects/create-and-collaborate.md), [endpoint authentication](endpoints.md), [PATs](pats.md), and [authorization](authorization.md) for the corresponding planes. The management routes below are source-verified references, not a claim that Viat exports a complete management OpenAPI document. Project OpenAPI describes published project endpoints.
+See also [project collaboration](../projects/create-and-collaborate.md),
+[endpoint authentication](endpoints.md), [PATs](pats.md) and the
+[authorization model](authorization.md). The management routes here are
+source-verified — **not** a promise of a complete management OpenAPI; the
+project OpenAPI describes published project endpoints.
 
-## Platform password session
+## Platform password sessions
 
-Prerequisites: an activated deployment, HTTPS, and an existing platform account. Public registration depends on the deployment registration policy. `GET /auth/config` reports the policy; do not assume `/auth/register` is open.
+Prerequisites: an activated instance, HTTPS and an existing platform
+account. Public registration follows deployment policy — check
+`GET /auth/config` first and never assume `/auth/register` is open.
 
-Source-derived, **unexecuted** request examples; `BASE` is your instance URL and variables contain disposable credentials, not literal sample passwords.
+Requests below are source-written and **unexecuted**; `BASE` is the
+instance address and variables hold isolated test-account credentials,
+never production passwords.
 
 ```sh
 curl -sS "$BASE/auth/login" -H 'Content-Type: application/json' \
   -d '{"email":"developer@example.invalid","password":"REPLACE_WITH_DISPOSABLE_PASSWORD"}'
 ```
 
-`POST /auth/login` requires `email`, `password`. Successful JSON contains `access_token`, `refresh_token`, `refresh_expires_at`, `user_id`, `email`, and a one-time `overview_token`. Send `Authorization: Bearer $PLATFORM_ACCESS_TOKEN` on management requests. Password success may instead return `401 mfa_required` or `mfa_enrollment_required` plus `mfa_ticket`; finish [MFA](mfa.md) before expecting a session.
-
-`POST /auth/register` takes `email`, `password`, optional/null `display_name`. This creates a **platform** account, not a project customer. See [platform users](../instance/platform-users.md) for bootstrap/invitation and role restrictions.
+- `POST /auth/login` requires `email` and `password`. Success returns
+  `access_token`, `refresh_token`, `refresh_expires_at`, `user_id`,
+  `email`, plus the `overview_token` shown **exactly once**. Management
+  requests send `Authorization: Bearer $PLATFORM_ACCESS_TOKEN`. A correct
+  password can still first answer `401 mfa_required` or
+  `mfa_enrollment_required` with an `mfa_ticket` — complete
+  [MFA](mfa.md) to get a session.
+- `POST /auth/register` takes `email`, `password` and optional/null
+  `display_name`; it creates a **platform account**, not a project
+  customer. Bootstrap, invitations and role limits:
+  [platform users](../instance/platform-users.md).
 
 | Route | Input | Output and effect |
 | --- | --- | --- |
-| `GET /auth/whoami` | Platform bearer | Public account identity/role; not a password or token dump |
-| `POST /auth/refresh` | `{"refresh_token":"$PLATFORM_REFRESH_TOKEN"}` | New access/refresh pair; same absolute refresh expiry; `overview_token` omitted |
-| `POST /auth/logout` | Same refresh-token shape | `{"ok":true}` even if unknown; revokes that refresh row and, for an unrotated row, that login's overview reader |
-| `POST /auth/logout-all` | Platform bearer | `{"ok":true,"revoked":N}`; revokes other refresh sessions, preserving current `sid` where present; removes all overview tokens |
-| `GET /auth/sessions` | Platform bearer | Session inventory; use returned IDs, not token strings |
-| `DELETE /auth/sessions/{id}` | Platform bearer | Revokes a session owned by the caller; not arbitrary users' sessions |
-| `PUT /auth/password` | `old_password`, `new_password`, optional `code` | Password replacement and renewed login response; enrolled MFA requires a current authenticator/recovery code |
+| `GET /auth/whoami` | Platform bearer | Public identity/roles; never passwords or token sets |
+| `POST /auth/refresh` | `{"refresh_token":"$PLATFORM_REFRESH_TOKEN"}` | A new access/refresh pair; the absolute refresh validity is unchanged; **no** `overview_token` |
+| `POST /auth/logout` | Same refresh-token body | `{"ok":true}` even for unknown tokens; revokes that refresh record; an unrotated record also revokes that login's overview reader |
+| `POST /auth/logout-all` | Platform bearer | `{"ok":true,"revoked":N}`; revokes other refresh sessions (keeping the current `sid` when present); deletes all overview tokens |
+| `GET /auth/sessions` | Platform bearer | Session inventory; use the returned IDs, never token strings |
+| `DELETE /auth/sessions/{id}` | Platform bearer | Revokes sessions **you own**; never arbitrary other users' |
+| `PUT /auth/password` | `old_password`, `new_password`, optional `code` | Replaces the password and returns a fresh login; with MFA enabled the current code/recovery code is required |
 
-Refresh is a rotation, not a parallel-use token. Persist the newest pair atomically and serialize refresh attempts: replaying a rotated refresh token can revoke the account's refresh sessions and overview readers. A JWT already issued is not a promise of immediate revocation when its refresh row disappears; do not treat logout as erasing every bearer copy. Keep access TTLs bounded.
+> [!WARNING]
+> Refreshing is **rotation**, not a long-lived reusable token: store the
+> newest pair atomically and refresh serially; replaying a rotated refresh
+> token can revoke the account's refresh sessions and overview readers.
+> Deleting a refresh record does not instantly kill issued JWTs, and
+> logout destroys no bearer copies — bound access-token lifetime instead.
 
-The `vso_` overview token can read only `GET /projects/{slug}/overview` for current memberships. It cannot edit, list arbitrary management collections or invoke project endpoints; it is not a PAT. Refresh does not re-show its secret. Logout behavior above is server behavior; CLI `viat auth logout` only clears local legacy/access/refresh fields and leaves `project_token` intact. Explicitly revoke server sessions and separately remove project credentials when offboarding.
+The `vso_` overview token only reads `GET /projects/{slug}/overview` for
+current member projects: no editing, no arbitrary management collections,
+no project endpoints, and it is not a PAT; refresh never re-shows it.
+These are the **server-side** logout behaviors — the CLI's
+`viat auth logout` only clears local legacy/access/refresh fields and
+keeps `project_token`. Offboarding revokes server sessions explicitly and
+handles project credentials separately.
 
-## Actual collaborator permissions
+## Effective project member permissions
 
-| Operation | Required project membership |
+| Operation | Required member role |
 | --- | --- |
-| Read project settings, members, resource metadata | Any member, including `operator` |
-| Read endpoint lists/details and trees | `owner`, `admin`, `developer` — **not** every member |
-| Authorizers, roles, project-user management, authorization-model reads/writes | Editor: `owner`, `admin`, `developer` |
-| Edit scripts/workflows/resources/endpoints | Editor |
-| Publish; project settings and membership changes | `owner` or `admin` (membership role escalation rules still apply) |
+| Read project settings, members, resource metadata | Any member (including `operator`) |
+| Read endpoint list/detail, endpoint trees | `owner`/`admin`/`developer` — **not** every member |
+| Authorizers, roles, project users, authz model read/write | Editors (`owner`/`admin`/`developer`) |
+| Edit scripts/workflows/resources/endpoints | Editors |
+| Publish; project settings and membership changes | `owner` or `admin` (still bounded by member-elevation limits) |
 
-Instance-level user/SSO administration uses the caller's **platform** role, not these project roles. Do not infer permission from a console navigation item. For example, an Operator can read a project's metadata yet receive `403` on `GET /projects/demo/trees`; a Developer can edit an endpoint but cannot publish it. Removing project membership takes away management access even if a PAT still exists.
+Instance-user/SSO administration checks the **platform role**, not the
+project role. A visible menu item ≠ an authorized request: an Operator
+reads project metadata but `GET /projects/demo/trees` answers `403`; a
+Developer edits endpoints but cannot publish. Removing membership kills
+that project's management access even if a PAT still exists.
 
 ## Project end-user administration
 
-Console/API editors use `/projects/{slug}/users`; project-admin applications use `/p/{slug}/_users`. These are not platform `/users`. [CLI project users](../cli/user.md) and [delegated users](../cli/p-user.md) document the separate commands.
-
-Create JSON fields: required `identity`; optional/null `password` **or** `password_hash` (never both), `display_name`, `email`, `phone`, `role`, `meta`. Imported hashes are supported Argon2 PHC or bcrypt credentials, not arbitrary hashes. Empty/missing credentials do not imply a usable password. `role` names an existing project role. List returns `{items,total,limit,offset}` and accepts `q`, `limit`, `offset`.
-
-For editor `PATCH /projects/{slug}/users/{identity}`, omitted profile fields preserve values, explicit `null` clears `display_name`/`email`/`phone`, and a supplied `meta` replaces the stored metadata object rather than deep-merging it. Delegated `PUT /p/{slug}/_users/{identity}/meta` takes `{meta,merge}`; `merge` defaults true and shallow-merges top-level keys; false replaces. Dedicated password replacement takes exactly one of `password`/`password_hash`; active/admin controls take `{"is_active":false}` / `{"is_admin":true}`. A user's own password change uses the distinct `POST /p/{slug}/auth/password` flow.
-
-The delegated `_users` surface requires a project user that administers the project. It manages local password identities, rejects `jwt:`/`oidc:`/`social:` identities, cannot assign an admin role, and refuses self-delete, self-deactivation and self-role change. Endpoint `project_users_grant` can authorize scoped script-side user operations; it does not turn the caller into a platform editor. Delegated mutations are audited. A caller-supplied `is_admin` field on a normal login is not a privilege grant.
+- Two entrances: console/API editors use `/projects/{slug}/users`;
+  project-admin apps use `/p/{slug}/_users`. Neither is the platform
+  `/users`. Commands: [CLI project users](../cli/user.md) and
+  [delegated user management](../cli/p-user.md).
+- Creation JSON: `identity` required; optional/null `password` **or**
+  `password_hash` (never both), `display_name`, `email`, `phone`, `role`,
+  `meta`. Imported hashes accept Argon2 PHC or bcrypt — **no** arbitrary
+  hashes; absence of credentials does not mean a usable password; `role`
+  must reference an existing project role. Lists accept `q`/`limit`/
+  `offset` and return `{items,total,limit,offset}`.
+- Editor `PATCH /projects/{slug}/users/{identity}`: omitted profile
+  fields keep; explicit null clears `display_name`/`email`/`phone`;
+  providing `meta` **replaces wholesale**, never deep-merges. Delegated
+  `PUT /p/{slug}/_users/{identity}/meta` takes `{meta,merge}`: `merge`
+  defaults to true for a **shallow** top-level merge, false replaces.
+  Password replacement must choose exactly one of `password`/
+  `password_hash`; activation/admin toggles take `{"is_active":false}` /
+  `{"is_admin":true}`; user self-service password change is
+  `POST /p/{slug}/auth/password`.
+- Delegated `_users` requires project-admin rights in the current project
+  user: it manages **local password** identities only (refusing
+  `jwt:`/`oidc:`/`social:`); it cannot grant the admin role; it cannot
+  delete/deactivate itself or change its own role. The endpoint's
+  `project_users_grant` can bound script-side user operations — it
+  **never** turns the caller into a platform editor. Delegated writes are
+  audited; adding `is_admin` to an ordinary login request grants nothing.
 
 ## Rotation and offboarding checklist
 
-1. Inventory management sessions/PATs, project memberships, end-user accounts/API keys, IdP clients, authorizer provider secrets and resource credentials separately.
-2. Revoke the compromised PAT/key, do not merely rename it. Mint the replacement, update consumers, verify, then revoke the old one. Creation secrets are generally shown once; list calls cannot recover them.
-3. Remove collaborator membership and, separately, deactivate the person's project end-user row. A shared email does not propagate either operation.
-4. For a compromised project password, replace it: the project session epoch invalidates old login tokens and associated refresh/code/MFA state. Revoking an API key alone does not retroactively erase every previously exchanged JWT.
-5. Revoke platform refresh sessions/overview readers explicitly. Local CLI logout is not server revocation. Remove local `project_token` and deployment/CI secret copies independently.
-6. Rotate upstream provider/resource secrets using their own reference. Back up the deployment's encryption key/secret backend securely; changing it without re-encryption can make stored secrets unreadable.
-7. Recheck both allowed and denied operations; review audit records without copying tokens into logs or tickets.
+1. Inventory separately: management sessions/PATs, project members, end
+   users/API keys, IdP clients, authorizer upstream secrets, resource
+   credentials.
+2. On leakage revoke PATs/keys — **not just rename**: create replacements
+   → update consumers → verify → revoke the old. Created secrets usually
+   display once and lists cannot recover them.
+3. Remove the collaborator membership and **separately** deactivate their
+   project user — the shared email propagates nothing.
+4. On project-password leakage change the password: the project session
+   epoch invalidates old login tokens plus related refresh/code/MFA
+   state. Revoking only the API key erases **no** already-exchanged JWTs.
+5. Explicitly revoke platform refresh sessions/overview readers; local
+   CLI logout is no server revocation; delete `project_token` and
+   credential copies in CI/deployments separately.
+6. Rotate upstream/resource secrets per their reference pages; back up
+   the instance encryption key/secret backend safely — swapping the key
+   without re-encryption makes existing secrets unreadable.
+7. Verify both allow and deny cases; **never** copy tokens into logs or
+   tickets during audits.
 
-Never send resource secrets to scripts or place credentials in URL query parameters, repository YAML or screenshots. Secrets are applied platform-side. For UI settings and deployment-only knobs see [instance settings](../instance/settings.md).
+Never hand resource secrets to scripts, and never put them in URL query
+parameters, repo YAML or screenshots; the platform applies secrets
+server-side. Console settings and deployment-level parameters:
+[instance settings](../instance/settings.md).
 
 ## Failures and verification
 
-Management errors normally use `{"error":"<code>","message":"<detail>"}`. `401` means the credential is absent/invalid/expired; `403` also covers wrong identity plane, missing membership, insufficient role or scoped-PAT mismatch. `404` may indicate the selected project/object does not exist. Confirm `whoami`, selected project and membership before changing credentials. Never “fix” a denied editor operation by making a published endpoint anonymous.
+Management errors are usually `{"error":"<code>","message":"<detail>"}`:
+`401` = missing/invalid/expired credentials; `403` can also be a wrong
+identity plane, missing membership, insufficient role or PAT project-scope
+mismatch; `404` = missing project/object. Check `whoami`, the current
+project and membership first — **never** "fix" editor permissions by
+making a published endpoint anonymous.
 
-**Evidence:** `crates/viat-api/src/{dto.rs,middleware_auth.rs,handlers/auth.rs,handlers/project_users.rs,handlers/project_user_admin.rs}`, `crates/viat-core/src/types/project.rs`, `crates/viat-cli/src/commands/auth.rs`. Examples were inspected, not executed; no account, SSO provider or remote cleanup was created by this reference.
+## Verification basis
+
+Contract source `03751a67`:
+`crates/viat-api/src/{dto.rs,middleware_auth.rs,handlers/auth.rs,handlers/project_users.rs,handlers/project_user_admin.rs}`,
+`crates/viat-core/src/types/project.rs`,
+`crates/viat-cli/src/commands/auth.rs`. Examples are source-checked and
+unexecuted; no accounts, SSO providers or remote cleanup tasks were
+performed for this page.

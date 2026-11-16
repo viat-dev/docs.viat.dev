@@ -8,44 +8,74 @@ channel: stable
 
 # Retention, history and safe deletion
 
-Retention is a host-operator configuration change with **irreversible data deletion**. Project roles cannot raise deployment retention. Before shortening any horizon, obtain data-owner/compliance approval, export required evidence and validate a recoverable backup. All examples are unexecuted; this page does not authorize running a purge.
+Retention is a host-operator configuration that **irreversibly deletes
+data**. Project roles cannot raise deployment retention. Before shortening
+any horizon: obtain data-owner/compliance approval → export required
+evidence → validate a recoverable backup. All examples are unexecuted; this
+page authorizes no purge.
 
-## Default lifecycle inventory
+## Default lifetimes
 
 | Data | Default | Actual cleanup boundary |
 | --- | --- | --- |
-| Execution summary | 90 days | Batched deletion by creation time; workflow children cascade with parent |
-| stdout/stderr/structured lines in PostgreSQL | 14 days | Whole old **monthly** partitions, not exact per-row 14-day TTL |
-| Execution/workflow I/O | 14 days | Clears payload fields independently, keeping summary rows |
-| Finished async run/result | 7 days | Finished rows; waiting future queued work is not simply aged out as finished output |
-| Chat message ledger | 90 days | Message history rows |
-| Chat peer context | 180 days inactive | Last activity, not account creation time |
-| Control-plane audit | 365 days | Platform `audit_logs`, not external business audit |
-| File-read audit | 90 days | Platform access records |
-| Idempotency key/stored response | 24 hours | Retry deduplication evidence/response horizon |
-| Script previous versions | 50 superseded versions, clamp 1..1000 | Count per script on edits, not days |
-| Published revisions | 20 | Pruned on publish, exact knob `VIAT_PUBLISH_REVIAT_KEEP` |
+| Execution summaries | 90 days | Batch-deleted by creation time; workflow child rows **cascade** with the parent |
+| PostgreSQL stdout/stderr/structured lines | 14 days | Whole old **monthly partitions** dropped — not a precise per-row 14-day TTL |
+| Execution/workflow I/O | 14 days | Payloads cleared independently; summaries remain |
+| Finished async tasks/results | 7 days | Finished rows; future queued tasks are not cleaned by this |
+| Chat message ledger | 90 days | Message-history rows |
+| Chat peer context | 180 days of **inactivity** | By last activity, not account creation |
+| Control-plane audit | 365 days | Platform audit_logs, not external business audit |
+| File-access audit | 90 days | Platform access rows |
+| Idempotency keys/stored responses | 24 hours | Dedup and retry-response window |
+| Superseded script versions | 50 per script (range 1..1000) | Pruned **by count per script** at edit time, not days |
+| Publish revisions | 20 | Pruned at publish; the exact variable is `VIAT_PUBLISH_REVIAT_KEEP` |
 
-See [all retention variables](../configuration/observability.md) for types, zero handling and scope. There is no general “0 means forever”: zero day counts are accepted and can delete almost everything old at the next pass. Zero interval is invalid for the timer even though numeric parsing accepts it. To preserve a hold, define an approved external evidence process; do not guess at a magic infinite value.
+Types, zero values and scopes: [full retention variables](../configuration/observability.md).
+There is no universal "0 = keep forever": **0 days can delete nearly all old
+data on the next pass**; an interval of 0 parses but cannot drive a timer.
+Legal holds belong in approved external evidence processes — never guess an
+"infinite" value.
 
-## Scheduler and granularity
+## Periodicity and granularity
 
-The loop defaults to every 24 hours. At boot it maintains PostgreSQL line-log partition coverage for the current and next five months. Destructive cleanup waits one full interval; it does not immediately purge everything on boot. Each pass logs errors and continues. Multiple instances coordinate the cluster job, but failure handling is idempotent rather than an immutable exactly-once guarantee.
+- Cleanup runs every 24 hours by default. Startup maintains PostgreSQL
+  line-log partitions for the current and next five months; the
+  **destructive pass waits a full period** rather than purging at every
+  boot. Stage failures log and continue; multi-instance coordination relies
+  on idempotent processing — not immutable exactly-once.
+- A month partition straddling the cutoff must stay, so line logs can
+  outlive the configured days. Payloads can vanish before summaries — a null
+  payload does not mean the original request was empty. Deleting an
+  execution summary removes its workflow steps too. Space reuse after
+  PostgreSQL DELETE is up to vacuum/storage management — **no** guarantee of
+  immediate space return to the OS.
+- Disabling `VIAT_RETENTION_ENABLED` also stops the loop's partition
+  maintenance and the expiry cleanup for OAuth/session/ticket/MFA/login
+  failures — without replacement maintenance it is not "safe infinite
+  retention". Upload spooling and other dedicated cleanups are separate.
+  **Never** "solve" a full disk by manually dropping active partitions or
+  truncating log parent tables.
 
-A monthly partition intersecting the line cutoff must remain, so observed line retention can exceed the configured number of days. Conversely, payloads can disappear before the corresponding execution summary. A null captured payload is not proof the original request was empty. Full execution deletion also removes dependent workflow steps. Storage reuse/file shrinking after PostgreSQL DELETE is controlled by database vacuum/storage management, not immediate operating-system space reclamation.
+## Planning and applying
 
-Disabling `VIAT_RETENTION_ENABLED` also disables the loop's partition maintenance and expired OAuth/session/ticket/MFA/login-failure cleanup; it is not a safe unbounded-retention strategy without replacement maintenance. Upload-spool and other dedicated sweeps are separate. Do not manually drop active partitions or truncate parent log tables to “fix” a full disk.
+1. Inventory: PostgreSQL, ClickHouse/Loki, business databases, object
+   stores, container logs, backups and exports — **deleting platform rows
+   deletes no external copies**.
+2. Define approved minimum/maximum retention per class, weighing personal
+   information in chat/payloads, audit evidence and client idempotency retry
+   windows.
+3. **Before lowering**: export evidence and record a backup restore point; a
+   post-purge snapshot cannot resurrect deleted data.
+4. Change the deployment variables (Compose requires explicit passing) and
+   restart on the maintenance plan. **Smaller values apply to
+   already-overdue history at the next pass** — not just to new data.
+5. Monitor cleanup logs and database disk/row/partition trends;
+   troubleshoot permissions, locks, DDL and storage errors — a healthy
+   process does not mean successful cleanup.
+6. Spot-check old/new records and external stores; keep approval records;
+   handle temporary export files per evidence policy.
 
-## Plan and apply a change
-
-1. Inventory what is kept in PostgreSQL, ClickHouse/Loki, business databases, object stores, container logs, backups and exports. Deleting the platform row does not erase external copies.
-2. Define approved minimum/maximum retention per class. Consider personal data in chat context and execution payloads, compliance evidence in audit, and clients' retry policy for idempotency.
-3. Export required audit evidence and record a backup/recovery point **before** lowering horizons. A database snapshot taken afterward cannot restore what was already purged.
-4. Change the relevant deployment variables, forwarding them into Compose explicitly, then restart under a maintenance plan. A smaller value applies to already-existing old rows at the next pass; it is not just a new-row policy.
-5. Watch server retention messages and database disk/row/partition trends. Investigate permission, lock, DDL and storage errors; do not claim cleanup succeeded because the process stayed healthy.
-6. Verify representative old/new records and external stores. Retain the approved change record and remove temporary export files only under your evidence policy.
-
-Example **unexecuted policy**, not a universal recommendation:
+The following is an **unexecuted policy example**, not general advice:
 
 ```dotenv
 VIAT_RETENTION_EXECUTION_DAYS=90
@@ -56,10 +86,23 @@ VIAT_RETENTION_IDEMPOTENCY_HOURS=24
 VIAT_RETENTION_INTERVAL_HOURS=24
 ```
 
-Shortening idempotency retention can allow an old retry to execute again once its stored key/response is gone. Shortening async-result retention can make callers lose completed output. Keep client behavior aligned with the chosen horizon, and provide durable business storage for outputs that must live longer.
+Two knock-on effects: shortening the idempotency window deletes old
+keys/responses, so **late retries can re-execute**; shortening the async
+result horizon can leave clients unable to fetch results. Keep client
+behavior consistent with the windows, and write long-lived outputs to
+durable business storage.
 
-## External systems and deletion recovery
+## External systems and mistaken deletions
 
-ClickHouse/Loki TTLs, PostgreSQL-resource business audit, S3 lifecycle/versioning, local file bytes, container logs and backups are **operator-owned policies**, not controlled by the above loop. External secret backends can retain historical values after resource changes; coordinate their lifecycle with retained database references. Rust shared-artifact garbage collection is off by default and unsafe across mixed toolchains/architectures without a complete live set.
-
-A mistakenly shortened horizon cannot be undone by increasing it. Stop further destructive sweeps under approved incident control, preserve the affected state, and restore into an **isolated** environment first using [backup/restore](backup-restore.md). Reconcile only required data back under a reviewed plan; blindly replacing production with an old database loses newer writes and may resurrect revoked credentials or queued side effects.
+- ClickHouse/Loki TTLs, business-database audit, S3 lifecycle/versioning,
+  file bytes, container logs and backups are all **operator-defined**
+  policies. External secrets can outlive resource edits — coordinate with
+  the database reference lifecycle. Rust shared-artifact GC is off by
+  default: without the complete live-set, no "safe cleanup" across mixed
+  architectures/toolchains exists.
+- Raising a horizon after mistakenly shortening it **recovers nothing**.
+  Under incident-approval controls: stop further destructive cleanup →
+  preserve the scene → restore to an **isolated environment** per
+  [backup-restore](backup-restore.md) → reconcile only the needed data
+  after review. Replacing production with an old database loses new writes
+  and can resurrect revoked credentials or queued tasks with side effects.

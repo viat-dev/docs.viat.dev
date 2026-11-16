@@ -8,11 +8,16 @@ channel: stable
 
 # TLS, reverse proxies and streaming
 
-Use a reverse proxy/ingress for production TLS policy, or direct TLS when no proxy is available. This page's configuration and validation commands are **unexecuted**. DNS, certificates, firewall and proxy changes need infrastructure approval. Prepare a working rollback and avoid exposing the plaintext listener directly when relying on proxy trust.
+Prefer a reverse proxy/ingress for production TLS; direct TLS works when no
+proxy exists. All configuration/validation commands here are
+**unexecuted**. DNS, certificates, firewall and proxy changes need
+infrastructure approval. Prepare a rollback, and when relying on trusted
+proxy headers, **never** expose the plaintext listener directly.
 
-## Option A: direct TLS
+## Option A: built-in TLS
 
-Provide a PEM full chain and matching PEM private key readable by the **server**, not project scripts. Mount them read-only at stable paths:
+Provide a PEM full chain plus matching private key, server-readable but not
+script-readable, mounted read-only at a stable path:
 
 ```dotenv
 VIAT_BIND=0.0.0.0:8443
@@ -22,13 +27,29 @@ VIAT_PUBLIC_URL=https://api.example.com:8443
 VIAT_TRUST_PROXY_HEADERS=false
 ```
 
-Both TLS paths or neither: one missing path/initially unreadable or invalid pair fails startup instead of silently falling back to HTTP. TLS listener binding requires an IP:port socket address. Renew by atomically replacing a matching pair; the server polls modification times every 60 seconds. Failed reload logs and retains the previous working pair. Path changes require restart. There is no built-in ACME issuer, mTLS client-auth configuration or full nginx-equivalent cipher/OCSP policy surface.
+Essentials:
 
-The image healthcheck follows bind/TLS configuration, probes `/healthz`, and deliberately skips local HTTPS identity/trust checks. It does **not** prove the public certificate is valid. Monitor expiry/served identity externally using a trust-validating client.
+- The certificate and key must be set **together or not at all**; one
+  missing, initially unreadable or mismatched fails startup — **no silent
+  HTTP fallback**. The TLS listener requires an IP:port.
+- Renewal = atomically replacing the matching pair; mtime is checked every
+  60 seconds; a failed reload logs and **keeps the previous pair**;
+  changing paths needs a restart.
+- Not included: a built-in ACME issuer, mTLS client-auth configuration, or
+  a full nginx-equivalent cipher/OCSP surface.
+- The image healthcheck follows bind/TLS probing healthz and **deliberately
+  skips** local HTTPS identity/trust validation — it **proves nothing about
+  the public certificate**; monitor expiry/actual identity with an external
+  trust-validating client.
 
 ## Option B: nginx TLS termination
 
-Run Viat on a private/loopback listener, set `VIAT_PUBLIC_URL=https://api.example.com`, and enable `VIAT_TRUST_PROXY_HEADERS=true` **only** when all traffic passes your controlled proxy. This standalone nginx template assumes the backend is host-loopback 8080; in separate containers use an approved private network/address instead.
+Viat listens on loopback/private networking with
+`VIAT_PUBLIC_URL=https://api.example.com`; set
+`VIAT_TRUST_PROXY_HEADERS=true` only when **all** traffic traverses the
+controlled proxy. This standalone template assumes a backend on host
+`127.0.0.1:8080`; split-container deployments substitute the approved
+private address.
 
 ```nginx
 # http context
@@ -71,25 +92,58 @@ server {
 }
 ```
 
-For one edge proxy the template **overwrites** incoming forwarded IPs rather than preserving caller claims. Viat uses the last X-Forwarded-For element; in multiple trusted proxy layers set/validate the chain deliberately. Blocking direct backend ingress is mandatory; otherwise callers can spoof forwarded headers.
+Four key semantics of the template:
 
-The template disables response buffering for all paths for simplicity, preserving SSE/NDJSON/log-tail behavior. You can narrow this after verification. `proxy_read_timeout` is an **idle-between-reads** timeout, not the entire execution budget. Align it with legitimate silence, sync ceiling and publish build waits; long streams/log tail may need a longer idle allowance. WebSocket Upgrade headers are essential; ordinary HTTP must not get forced Upgrade. Compression/extra buffering for streams can delay delivery.
+- For caller-forwarded IPs, the single-edge template **overwrites** rather
+  than preserving forged chains. Viat takes the **last**
+  `X-Forwarded-For` segment; multi-hop trusted proxies must validate per
+  the real chain, and bypass paths straight to the backend must be blocked
+  — otherwise callers forge headers.
+- Response buffering is off for every path to keep SSE/NDJSON/tail instant
+  — narrow it after validation.
+- `proxy_read_timeout` is the **idle time between reads**, not a total
+  execution budget: reconcile with sensible silence, the sync ceiling and
+  publish-build waits; long streams/tails may need longer idle allowances.
+- WebSocket requires `Upgrade`; plain HTTP must **not** be force-upgraded.
+  Stream compression/extra buffering delays output.
 
-## Prefix deployment
+## Sub-path deployment
 
-For `https://api.example.com/viat`, set `VIAT_PUBLIC_URL` to exactly that base. No image rebuild or extra server prefix variable is required. Change the proxy's application `location /` to `location /viat/` and keep `proxy_pass http://viat_backend;` **without a URI suffix**, preserving the prefix for the server; add an exact `/viat` redirect to `/viat/` if desired. Do not independently prepend `/viat` twice. Update external IdP callback/webhook registrations, CLI server URLs and monitoring paths to include the prefix.
+With the external address `https://api.example.com/viat`:
 
-Use a deployment-specific prefix that does not collide with reserved platform namespaces. Test `/viat/ui/`, an asset, login callback and one fixture `/viat/p/PROJECT/PATH`. A proxy can also strip the prefix once, but combining incompatible stripping/rewrite rules causes asset/auth redirect failures.
+- Set `VIAT_PUBLIC_URL` to that value — **no** image rebuild or extra
+  prefix variable.
+- Change the application location from `/` to `/viat/`, keeping
+  `proxy_pass http://viat_backend;` **without a URI suffix** (the server
+  strips the prefix); add an exact `/viat` → `/viat/` redirect when
+  needed. **Never add the prefix twice.**
+- Update IdP callbacks, webhooks, CLI server and monitoring paths; the
+  prefix must not collide with reserved platform namespaces.
+- Verify: `/viat/ui/`, static assets, login callbacks and the fixture
+  `/viat/p/PROJECT/PATH`. The proxy may strip once itself, but mixed
+  inconsistent rewrites break asset/auth redirects.
 
-## Upload limits and buffering
+## Upload sizes and buffering
 
-The default `2m` proxy ceiling matches ordinary buffered execution's 2 MiB limit. It is too small for a legitimate multipart file upload or dedicated S3 streaming path. Add **only approved route-specific locations**, with the same inherited proxy headers/timeouts, larger bounded `client_max_body_size`, `proxy_request_buffering off`, and explicit `proxy_pass`/response-buffering behavior. For example `/p/demo/upload` can have a reviewed 110m proxy limit for a 100 MiB file plus multipart overhead; this is a policy example, not a product default. Dedicated S3 paths match `/p/PROJECT/_s3/...` and require their own reviewed size policy.
-
-Increasing nginx limits does not raise `VIAT_STORAGE_MAX_FILE_BYTES`, resource limits or the 2 MiB buffered text limit. Unlimited proxy uploads are not required just because a stream exists. Budget temporary disk, file count and concurrent uploads. Rust artifact routes have a separate 512 MiB product ceiling.
+- The default `2m` matches the ordinary 2 MiB buffered execution but **does
+  not** cover legitimate large multipart or dedicated S3 streams. Add
+  locations for **approved paths only**: inherit the same headers/timeouts,
+  set a larger bounded `client_max_body_size`,
+  `proxy_request_buffering off`, and explicit proxy_pass/response
+  buffering. For example `/p/demo/upload` may use `110m` per approval
+  (a 100 MiB file plus multipart overhead) — a policy example, **not** a
+  product default. The S3 paths `/p/PROJECT/_s3/...` need their own size
+  policy.
+- Raising nginx limits **never** raises
+  `VIAT_STORAGE_MAX_FILE_BYTES`, resource caps or the 2 MiB text buffer.
+  Supporting streams is not unlimited uploads: budget temp disk, file
+  counts and concurrency. Rust artifacts keep their separate 512 MiB
+  product cap.
 
 ## Verify trust, redirects and renewal
 
-Unexecuted examples; use the correct public hostname and approved CA bundle, not `-k`:
+Unexecuted templates; use the real public domain and approved CA,
+**without `-k`**:
 
 ```sh
 curl --fail --silent --show-error https://api.example.com/healthz
@@ -99,6 +153,17 @@ openssl s_client -connect api.example.com:443 \
 nginx -t
 ```
 
-For private CA, install the approved root/intermediate trust at each actual client boundary: proxy, browser/OS, CLI, server outbound client and worker runtime as appropriate. `--cacert /path/to/approved-ca.pem` tests curl trust, not every Viat client. Worker CA environment names require explicit [passthrough](../configuration/integrations.md); some replace rather than append trust. There is no universal `VIAT_CA_BUNDLE` server variable. Business PostgreSQL/MySQL resource TLS has [known limitations](../configuration/database.md).
+For private CAs, install the approved root/intermediate chain at each
+**real client boundary**: proxy, browser/OS, CLI, server egress and
+workers separately. curl `--cacert` validates only curl, not every Viat
+client; worker CA variables need explicit
+[passthrough](../configuration/integrations.md) — some **replace** rather
+than extend trust; there is no generic `VIAT_CA_BUNDLE` server parameter.
+Business PostgreSQL/MySQL TLS has [real limits](../configuration/database.md).
 
-After validation and approval, reload nginx through your service manager, verify a real fixture stream emits incrementally, a WebSocket upgrades, OIDC redirects use the public HTTPS origin/prefix, and the renewed public certificate is actually served. Do not run a live IdP/provider test without opt-in. If validation fails, keep/reinstate the prior certificate/configuration; do not weaken certificate checks as the recovery plan.
+After validation approval: reload nginx via the service manager → verify a
+fixture streaming progressively, WebSocket upgrades, OIDC URLs using the
+correct HTTPS/prefix, and the **actual new certificate**. Real
+IdP/provider tests need explicit opt-in. On failure, keep/restore the old
+certificate configuration — **never** disable certificate checking as a
+recovery.

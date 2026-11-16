@@ -8,17 +8,27 @@ channel: stable
 
 # Control-plane, business-data and file-access audit
 
-Audit is not one table or one permission. Choose the record that answers your question; ordinary execution logs are covered in [logs](logs.md). All example requests and database operations are **unexecuted**. Exports can contain identities, IP addresses and sensitive business values: restrict access and retention.
+Audit is not one table or one permission — decide which question you are
+answering, then pick the right entry point. Ordinary execution logs:
+[logs](logs.md). All example requests/database operations are
+**unexecuted**; exports can contain identities, IPs and sensitive business
+values — restrict access and retention.
 
-| Trail | Where and what | Read permission |
+| Audit | Store and content | Read access |
 | --- | --- | --- |
-| Control-plane | Platform PostgreSQL `audit_logs`: authenticated object/config mutations, method/path/status/actor/IP, not general body diffs | Project Owner/Admin for project trail; **platform Owner only** for deployment-wide `/admin/audit` |
-| Business-data | A `postgresql` resource's own audit table/triggers: row changes, identity/reason/request linkage | Any project member through management routes; project data-plane callers need authz `audit` type `read` grant |
-| File access | Platform file-read access records, separate from file mutations/business metadata | Governed by its management/access surfaces, not automatically public because a file link exists |
+| Control-plane | Platform PostgreSQL `audit_logs`: attributed configuration/object changes — method, path, status, actor, IP; **not** a generic body diff | Project Owner/Admin for the project scope; instance-wide `/admin/audit` is **platform Owner only** |
+| Business data | The postgresql resource's own audit tables/triggers: row changes, identity, reason, request correlation | Management routes for any project member; data-plane calls need authz audit-type read authorization |
+| File access | Platform file-read records, independent of file modification/business metadata | Authorized per its management/access interface — holding a file link discloses nothing |
 
-## Control-plane trail
+## Control-plane audit
 
-The mutation layer covers POST/PUT/PATCH/DELETE under project, admin and user-management paths, including attributable refused attempts. It does **not** record every read, anonymous unauthenticated noise, `/auth` session events or ordinary `/p` data-plane calls. No generic body/diff archive is kept; special operations can attach an intentional summary. Therefore an audit row shows an attempted operation and response, not proof of every downstream semantic change or a tamper-proof complete activity recording.
+Coverage: POST/PUT/PATCH/DELETE on project, admin and user-management paths,
+including attributable **rejected attempts**. **Not** recorded: every read,
+anonymous noise without identity, `/auth` session events, ordinary `/p`
+data-plane requests. No generic request bodies/diffs are stored (individual
+operations may attach deliberately designed summaries) — so a record proves
+"this operation and its response", not every downstream semantic change, and
+it is not a tamper-proof recording of all activity.
 
 ```sh
 curl --fail-with-body --get "$BASE/projects/$PROJECT/audit" \
@@ -27,17 +37,42 @@ curl --fail-with-body --get "$BASE/admin/audit" \
   -H "Authorization: Bearer $OWNER_TOKEN" --data-urlencode 'limit=100'
 ```
 
-Filters: `actor` (email), `since` (RFC3339), `limit` (default 100, clamp 1..500), and paired `before`/`before_id`. Response is `{entries,next_before?,next_before_id?}`. Return **both** cursor fields together; a half cursor gives 400 and timestamp-only paging can miss rows. A 403 for `/admin/audit` is expected for Admin or a project Owner without platform Owner role. Project role and platform role are distinct.
+Filters: `actor` email, `since` RFC3339, `limit` (default 100, range
+1..500) and the paired `before`/`before_id`. The answer is
+`{entries,next_before?,next_before_id?}`; paging must pass **both cursors
+back together** — one missing answers 400, and time-only paging drops rows.
+A 403 for an Admin or non-platform-Owner project Owner on `/admin/audit` is
+expected: platform and project roles are independent.
 
 ## Business-data audit prerequisites
 
-Only `postgresql` resources implement this trail; the complete resource audit-block fields are in the [PostgreSQL resource reference](../assets/resources/postgresql.md). The configured resource account needs privileges to install the audit schema/table/function and per-table triggers and query the trail. Audited tables need primary keys; names/ignored columns must pass validation. Saving an `audit` block or explicitly installing reconciles DDL in that business database—this is not merely a platform metadata edit.
-
-Plan the change with database owners: snapshot/backup the target, inventory non-platform writers, choose `unattributed=reject` (default) or deliberately `record`, and decide each table's `reason_required`/ignored columns. Enabling reject can make existing external writes fail; do not discover this during a production import. Changing the global default later does not magically replace already-installed trigger behavior; reconcile the resource and verify.
-
-The default request reason is the trimmed UTF-8 `X-Viat-Reason` header. Endpoint `overrides.audit_reason` can select `header.NAME`, `body.FIELD` (JSON string field), or `none`; a raw-body endpoint cannot extract a body field. For example, an approved fixture write can send `X-Viat-Reason: fixture validation`. Requiring a reason is a table policy, not a guarantee that every endpoint supplies one.
-
-The platform supplies operator/request/reason context on supported writes; triggers enforce/record changes in the same transaction. A rollback does not become a committed audit event. Out-of-band writes without platform identity reject by default, or record as unattributed if explicitly configured. A database owner/superuser can bypass/alter triggers; this is not an independent immutable ledger against a privileged DBA.
+- Only `postgresql` resources qualify; the full audit-block fields:
+  [PostgreSQL resource](../assets/resources/postgresql.md).
+- The resource's database role must be able to install the audit
+  schema/tables/functions and per-table triggers, and to query the audit
+  tables. Audited tables need primary keys; names/ignored columns must
+  validate.
+- **Saving an audit block or explicitly installing runs DDL in the business
+  database** — it is not a platform-metadata-only change.
+- Plan with the business-database owner: backup targets → inventory every
+  non-platform writer → choose the default `unattributed=reject` or an
+  explicit `record` → decide per-table `reason_required`/ignored columns.
+  Enabling reject can break pre-existing external imports — **do not
+  discover that after go-live**. Changing the global default later rewrites
+  no existing triggers: coordinate with the resource and verify.
+- Attribution: the default reason is the trimmed UTF-8 `X-Viat-Reason`
+  header; the endpoint's `overrides.audit_reason` may pick `header.NAME`,
+  `body.FIELD` (a JSON string field) or `none`; raw-body endpoints cannot
+  extract body fields. Approved fixture writes may send
+  `X-Viat-Reason: fixture validation`. **Whether a reason is mandatory is a
+  per-table policy** — no endpoint is guaranteed to supply one.
+- Write-path semantics: the platform attaches operator/request/reason on
+  supported write paths, and triggers enforce/record within the **same
+  transaction** — a rolled-back transaction leaves no committed audit
+  event. External writes without platform identity are rejected by default
+  and recordable as unattributed only with explicit configuration. A
+  database owner/superuser can still bypass or alter triggers: **this is
+  not an immutable ledger independent of privileged DBAs**.
 
 ### Query and export
 
@@ -48,19 +83,41 @@ curl --fail-with-body --get \
   --data-urlencode 'table=public.samples' --data-urlencode 'limit=100'
 ```
 
-Management query supports optional resource `folder` plus `table`, `record_id`, `operator`, `request_id`, `since`, `until`, `limit`, `before`; returns `{items,next_before,limit}`. Limit defaults 100, ceiling `VIAT_AUDIT_QUERY_MAX_ROWS` (1000). `before` is the returned `RFC3339,integer-id`. Export uses the same management path plus `/export`; use [CLI audit](../cli/audit.md) for a complete streaming export command and format.
+- Management query: optional resource `folder`, filters
+  `table/record_id/operator/request_id/since/until/limit/before`; returns
+  `{items,next_before,limit}`; default 100 capped by
+  `VIAT_AUDIT_QUERY_MAX_ROWS` (1000); `before` is the returned
+  `RFC3339,integer-id`. Export = the same management path plus `/export`;
+  full streaming export commands/formats: [CLI audit](../cli/audit.md).
+- Data plane: `GET /p/PROJECT/_audit/RESOURCE` with the `/_export` suffix —
+  project authentication plus the authz `audit` type's `read` action
+  (attributes `resource`/`table`). **Declaring the type grants nobody
+  anything** — write explicit rules. Queries/exports use the resource
+  database's credentials, not the platform account.
+- Edges: a missing audit table can return an **empty page instead of 404**;
+  an existing PostgreSQL resource without audit configured is still queryable
+  at the default `public.viat_audit` location — so **an empty result proves
+  no such thing as "every write was audited"**. Non-PostgreSQL resources are
+  refused.
 
-The data-plane equivalents are `GET /p/PROJECT/_audit/RESOURCE` and `/_export` suffix. They use project authentication and authz type `audit`, action `read`, resource attributes `resource`/`table`. Declaring the type grants nobody access automatically; write an explicit policy. Query/export reads with the resource's database credentials, not the platform DB role.
+## Errors, retention and evidence
 
-An absent trail table can appear as an empty page, not necessarily 404; an existing PostgreSQL resource without configured audit can be queried against the default location (`public.viat_audit`). Empty result is not proof every write was audited. Non-PostgreSQL resources are refused.
+| Symptom | Action |
+| --- | --- |
+| `400 audit_reason_required` | Supply the reason through a supported request/script interface; never delete triggers as a routine bypass |
+| `403 audit_unattributed` | No attached identity — determine whether the write came from the platform or an external import, then decide policy explicitly |
+| DDL/primary-key/permission failure | Stop the rollout, fix target permissions/schema and coordinate; do not hand every script superuser |
+| Resource unreachable | Management errors are verbose; the public data plane **deliberately** hides database details — read the internal logs you are entitled to, not public probing |
 
-## Errors, retention and evidence handling
+Retention: `VIAT_RETENTION_AUDIT_DAYS=365` covers only the platform
+control plane; file access uses `VIAT_RETENTION_FILE_ACCESS_DAYS=90`;
+**business-audit lifecycle is managed on the resource database** — keep the
+evidence consistent with triggers/schema and include it in business-database
+backups and isolated recovery. PostgreSQL rows/export files do not
+automatically become WORM/signed evidence; compliance needs approved
+external immutable storage.
 
-- `400 audit_reason_required`: supply the required reason through the supported request/script interface; do not disable the trigger as a routine workaround.
-- `403 audit_unattributed`: identity was not attached. Determine whether the writer is platform-mediated or an external import; choose an explicit attribution policy.
-- DDL/primary-key/permission failure: stop rollout, restore correct target privileges/schema and reconcile; do not grant superuser to every script.
-- Resource unreachable: management errors can be more verbose; public data-plane errors intentionally withhold database details. Inspect privileged logs, not public probing.
-
-`VIAT_RETENTION_AUDIT_DAYS=365` governs platform control-plane rows, **not** the external business trail. File reads use `VIAT_RETENTION_FILE_ACCESS_DAYS=90`. Business audit lifecycle must be managed in the resource database, preserving required evidence and schema/trigger consistency. Include it in external database backups and isolated restore drills. PostgreSQL records and export files are not automatically WORM/signed evidence; use approved external immutable storage if required.
-
-When exporting, record scope, time, filters and cursor completion, hash the completed artifact and store it with access controls. Avoid relying on a screenshot or a single page as a complete audit. Review [retention](retention.md) and [backup/restore](backup-restore.md) before purging or restoring evidence.
+When exporting: record the scope, time, filters and whether cursors ran to
+completion; hash the full file and store it access-restricted. **A
+screenshot or one page of data is not an audit.** Before cleanup/restore,
+read [retention](retention.md) and [backup-restore](backup-restore.md).

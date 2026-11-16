@@ -175,10 +175,17 @@ These are **instructions for an explicitly authorized local exercise**, not step
 
 Cleanup does not retract notifications, restore business database writes or cancel already running tasks. MCP has no universal transaction, cancellation, undelete or “undo everything” tool. Project rollback restores serving revisions, **not live `uses:` modules** or external effects. Execution/audit records can remain according to retention policy; do not delete them as a cosmetic cleanup step.
 
-## Maintenance evidence and known discrepancies
+## Known discrepancy notes
+
+> [!NOTE]
+> Permission wording follows each tool page: the endpoint/tree/script/workflow
+> **read** tools actually require project Editor rights — not "any member may
+> read". `read_script` answers 409 asking for `folder` on cross-folder name
+> clashes without enumerating candidates — use `list_scripts` to list.
+
+## Verification basis
 
 - Inventory/inputs: `contracts/1.1.0/mcp-tools.json`; actual registration and result wrapping: `crates/viat-mcp/src/tools/service.rs`. Schemas are mechanical field evidence, not the semantic source of these pages.
 - Config/HTTP/errors: `crates/viat-mcp/src/config.rs`, `http.rs`, `error.rs`, `lib.rs`; CLI credential-key comparison: `crates/viat-cli/src/config.rs`. The MCP/CLI token-key mismatch is documented above rather than claiming refresh support.
 - Tool-specific behavior and integration regression cases: `crates/viat-mcp/src/tools/*.rs`, `crates/viat-mcp/tests/it/`. Role gates were checked in the API handlers for endpoints, trees, scripts, workflows, schedules, alerts, queue triggers, files, logs, async runs, audit, resources, projects and publishing.
-- Existing source prose broadly describes readers as read-only/member-accessible; actual endpoint/tree reader handlers require Editor. The read_script schema description says ambiguity names folders, but the actual 409 asks for folder without enumerating them: use list_scripts.
 - Examples, timestamp values, synthetic IDs, local provider stubs and expected shapes are **unverified by execution**. This reference does not claim end-to-end provider delivery, network readiness, executable-example validation or publication approval.

@@ -9,13 +9,31 @@ contract_ids: ["cli.testcase.create", "cli.testcase.list", "cli.testcase.run", "
 
 # Saved regression cases
 
-A saved case is server-side `(args,expected,match_mode)` for a **script or workflow draft**. It is not a fake-resource unit test, endpoint fixture, recorded HTTP status assertion or publication snapshot. It runs **real resources** as the system test/scheduler principal, not with the console operator's caller permissions. Saving does not execute it; running it and publishing can write/send/charge real services. Use a separate test project/resource dataset and explicit approval for external actions.
+A saved case lives on the server: `args + expected + match_mode` for a
+**script/workflow draft**, run automatically before every publication. It is
+not a fake-resource unit test, not an endpoint fixture, not an HTTP status
+assertion and not a publish snapshot — it is the last layer of the publish
+gate.
 
-All project members may list/read cases. Create/update/enable/disable/delete/**run** require content-edit rights (Owner/Admin/Developer). Cases identify target kind/folder/name rather than an endpoint id; the target is immutable on update. The console saves a case from an observed Test result, then can inspect/edit/run it; the API/CLI also support creation directly.
+Two things to internalize first:
 
-## Complete API and examples
+- Running a case touches **real resources** under the system
+  test/scheduler principal, not the console user's caller permissions.
+  Saving executes nothing; but run and publish can really write, send and
+  cost money — isolate the project/data and get approval for external
+  actions.
+- Permissions: list/read for any project member; create/update/enable/
+  disable/delete/**run** all need content-edit rights
+  (Owner/Admin/Developer). Targets are kind/folder/name, never endpoint ids;
+  updates cannot retarget.
 
-Source-derived/unexecuted, existing script `echo` returning `{hello:name}`:
+The console can save a case straight from an observed Test output and then
+view/edit/run it; the API/CLI can create them directly.
+
+## Full API and examples
+
+Source-derived, unexecuted. Assume an existing `echo` returning
+`{hello: name}`:
 
 ```http
 POST /projects/demo/test-cases
@@ -29,20 +47,32 @@ Content-Type: application/json
 {"id":"00000000-0000-4000-8000-000000000001","project_id":"00000000-0000-4000-8000-000000000002","target_kind":"script","target_folder":"","target_name":"echo","name":"happy-path","enabled":true,"args":{"name":"Ada"},"expected":{"hello":"Ada"},"match_mode":"subset","created_at":"2026-11-06T00:00:00Z","updated_at":"2026-11-06T00:00:00Z"}
 ```
 
-| Field | Create / update semantics |
+| Field | Create/update semantics |
 | --- | --- |
-| `target_kind` | Required script/workflow, no endpoint target. |
-| `target_folder` | Optional/null becomes root `""` at creation; separate from target_name. |
-| `target_name` | Required leaf name. Cases are not proof the target exists/runs until actually run. |
-| `name` | Required, trimmed/nonempty; unique per target. Duplicate maps to 400, not a silent overwrite. |
-| `args` | Creation omitted/null → `{}`; must be object. |
-| `expected` | Required JSON, can describe scalar/object/array/null. |
-| `match_mode` | Omitted/null → subset; exact also supported. |
-| `enabled` | New cases enabled; not controlled by creation body. Use dedicated enabled route. |
+| `target_kind` | Required `script`/`workflow`; no endpoint kind. |
+| `target_folder` | Omitted/null on create means root `""`; independent of target_name. |
+| `target_name` | Required leaf name; a case can exist before its target does — existence proves nothing about runnability. |
+| `name` | Required, non-empty after trim, unique per target; duplicates answer 400, no overwrite. |
+| `args` | Omitted/null on create means `{}`; must be an object. |
+| `expected` | Required JSON; scalar/object/array/null all allowed. |
+| `match_mode` | Omitted/null means `subset`; the other option is `exact`. |
+| `enabled` | New cases start enabled; the create body does not control it — a separate route does. |
 
-`GET /projects/<slug>/test-cases?target_kind=script&target_folder=&target_name=echo` lists the target's cases; `GET …/test-cases/<id>` reads full case. `PUT …/<id>` is **partial**, only `name,args,expected,match_mode`; absent **or null** preserves current values. `{}` no-op. Thus `args:{}` intentionally clears arguments; `expected:null` on update does **not** replace the expectation with JSON null (create a new case when that is the intended expectation). Cannot move target or change enabled here. `POST …/<id>/enabled {"enabled":false}` returns `{"enabled":false}`; true reenables. `DELETE …/<id>` returns `{"deleted":"<id>"}`.
+The remaining routes:
 
-`POST …/<id>/run {}` runs once even though enabled controls automatic gating, not this explicit action. Response examples use the actual enum serialization:
+- `GET /projects/<slug>/test-cases?target_kind=script&target_folder=&target_name=echo`
+  lists; `GET …/test-cases/<id>` reads one fully.
+- `PUT …/<id>` is a **partial update** accepting only
+  name/args/expected/match_mode; an omitted **or null** field is kept and `{}`
+  is a no-op. Two traps: `args:{}` **explicitly clears** the arguments, while
+  updating `expected:null` does **not** turn the expectation into JSON null —
+  create a new case for that. Target and enabled cannot change here.
+- `POST …/<id>/enabled {"enabled":false}` answers `{"enabled":false}`; true
+  re-enables.
+- `DELETE …/<id>` answers `{"deleted":"<id>"}`.
+
+`POST …/<id>/run {}` executes once explicitly — enabled gates the automatic
+runs, not this action. The actual enum serialization:
 
 ```json
 {"outcome":"passed"}
@@ -52,15 +82,50 @@ Content-Type: application/json
 {"outcome":{"failed":{"mismatches":[{"path":"hello","expected":"Ada","actual":"Bob","absent":false}]}}}
 ```
 
-`errored:{message}` means no comparable output (resolution/build/runtime/timeout/stream); `failed` means comparison disagreed. Direct script Test API differs: `POST …/scripts/echo/test-run {"args":{"name":"Ada"},"run_async":false,"record":false}` returns `ok,output,stdout,stderr,execution_log_id,request_id,recorded,error`. An explicit ViatResponse can have **output null** there even with a real response body. Saved cases correctly compare its **body**, not HTTP status/headers. A streaming target has no single comparable body and errors; use endpoint fixtures/stream-specific tests instead.
+`errored:{message}` means there was no comparable output at all
+(parse/build/run/timeout/stream); `failed` is specifically an output mismatch.
+Unlike the direct script test — `POST …/scripts/echo/test-run
+{"args":{"name":"Ada"},"run_async":false,"record":false}` returning
+ok/output/stdout/stderr/execution_log_id/request_id/recorded/error, where an
+explicit ViatResponse can leave **output null** even with a real body — the
+saved case compares the explicit response's **body**, not HTTP status/headers.
+Streaming targets have no single body and come back errored; use dedicated
+stream/endpoint tests for those.
 
-## Matching and publication gate scope
+## Matching and what the gate covers
 
-Subset recursively requires expected object keys/values, ignoring extra actual keys. Arrays still require equal length and compare elementwise in **both** modes; subset is not array membership/prefix matching. Exact requires full equality. Mismatches carry dotted/indexed path, expected, actual and absent flag; actual null with absent true is a missing field, not a present null.
+- `subset`: recursively requires every expected object key/value to exist in
+  actual; extra actual keys are ignored. **In both modes arrays must match in
+  length and item-by-item** — subset is not set inclusion or a prefix.
+- `exact`: full equality.
+- Mismatches record path (dot/index), expected, actual, absent; actual null
+  with absent=true means the **field is missing**, not "present and null".
 
-Both `POST …/publish/apply` and `POST …/endpoints/<id>/publish` run enabled cases for targets being published, after warnings and before committing snapshots. Project apply covers only publishable leaves, not every draft asset in the project; per-endpoint covers that leaf. Workflow publication also includes its baked step scripts, catch/control branches and nested script closure collected by the implementation. Targets are deduplicated. **Current target collection does not enumerate WebSocket route scripts**, so do not promise a saved-case gate for those routes merely because they freeze script source. Proxy/CRUD/native-auth have no saved script target cases.
+Both `POST …/publish/apply` and `POST …/endpoints/<id>/publish` run the
+enabled cases of the publication's targets **after warnings and before the
+snapshot commits**:
 
-Failed, errored and budget-skipped cases block with **409 publish_test_failures** and test_results. `VIAT_PUBLISH_REGRESSION_TIMEOUT_SECS` defaults 120, clamps 1–3600; it stops **starting** new cases after budget, not forcibly aborting an already-running case's target timeout. Disabled cases are ignored. If loading enabled cases fails, current implementation logs the error and proceeds without a gate: green publication is not proof tests ran. `acknowledge_test_failures:true` bypasses the pass entirely; it is independent from warning acknowledgement and is not a retry. Regression proves current draft behavior/environment, not that the newly built published dependency environment is valid. See [publication](../publishing/snapshots.md).
+- Project apply covers the publishable leaves only — not every draft in the
+  project; a single-endpoint publish covers that leaf.
+- Workflows collect their frozen step scripts, catch/control branches and the
+  nested script closure (deduplicated).
+- **The current collector does not enumerate WebSocket route scripts** — the
+  route freezing source does not promise gate coverage.
+- Proxy/CRUD/built-in auth have no saved script-target cases.
+
+`failed`/`errored`/budget-exhausted `skipped` all block the commit with
+**409 publish_test_failures** plus test_results.
+`VIAT_PUBLISH_REGRESSION_TIMEOUT_SECS` defaults to 120, clamped to 1–3600;
+the budget only stops **starting** new cases and does not force-abort a
+running case's own target timeout. Disabled cases are skipped.
+
+> [!WARNING]
+> The current implementation logs and proceeds when reading enabled cases
+> fails — **a successful publish does not prove tests ran**.
+> `acknowledge_test_failures: true` skips the pass decision outright; it is
+> independent of warning acknowledgement and is not a retry. Regression proves
+> the current draft/environment, not that a new dependency's build
+> environment works — see [publishing](../publishing/snapshots.md).
 
 ## CLI and lifecycle
 
@@ -72,6 +137,21 @@ viat testcase update 00000000-0000-4000-8000-000000000001 --match exact
 viat testcase disable 00000000-0000-4000-8000-000000000001
 ```
 
-These invocations are unexecuted; use ids returned by your isolated project. Commands also include show/enable/delete, `--kind workflow` where supported; see [complete CLI](../cli/testcase.md). Run returns nonzero for non-passed outcome, not a HTTP-transport-only signal. Saved cases are not portable repo resource cassettes; do not assume push/pull carries them. Changing expected merely to make a failure green destroys the assertion; inspect actual behavior and deliberately refresh after a known legitimate change. Disable/delete only test cases you own, and clean external effects separately; deleting a case/log never undoes a test run.
+Unexecuted examples; use ids from your isolated project. show/enable/delete
+also exist; workflows take `--kind workflow`. Full flags:
+[CLI testcase](../cli/testcase.md). A non-passed `run` exits non-zero — not
+just the HTTP success signal.
 
-Evidence: `crates/viat-api/src/handlers/test_cases.rs`, `regression.rs`, `handlers/{scripts,publish,snapshots}.rs`; `crates/viat-core/src/types/test_case.rs` comparison tests; `crates/viat-cli/src/commands/testcase.rs`. No cases, builds or real-resource calls were executed.
+Saved cases are not repo cassettes — do not assume push/pull carries them.
+**Editing expected just to go green destroys the assertion**: review the
+behavior, confirm the change is legitimate, then refresh the expectation.
+Disable/delete only your own cases; clean external effects separately —
+deleting a case or its logs never undoes a run that happened.
+
+## Verification basis
+
+Contract source `03751a67`: `crates/viat-api/src/handlers/test_cases.rs`,
+`regression.rs`, `handlers/{scripts,publish,snapshots}.rs`; the comparison
+tests in `crates/viat-core/src/types/test_case.rs`;
+`crates/viat-cli/src/commands/testcase.rs`. No cases, builds or real
+resource calls were executed.

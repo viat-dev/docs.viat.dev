@@ -181,4 +181,8 @@ Replace `API_KEY_ROW_UUID` with creation stderr's UUID or the UUID shown by `via
 
 ## Evidence and unverified boundaries
 
-See [repo-sync](../projects/repo-sync.md), [Python context](../assets/scripts/context.md), [workflows](../assets/workflows/overview.md), [HTTP](../triggers/http.md), [schedules](../triggers/schedules.md), [SQLite](../assets/resources/sqlite.md) and [CLI synchronization](../cli/sync.md). Targeted source: `crates/viat-runtime/src/python.rs` (transaction/query/execute), `crates/viat-api/src/runner/broker.rs` (SQLite locking), and the CLI repo endpoint/resource serializers. Unit fixtures cannot establish real scheduler identity/lease behavior, broker timeout/rollback behavior, publication or an external system's CDC/idempotency semantics; those require separately approved integration checks.
+See [repo-sync](../projects/repo-sync.md), [Python context](../assets/scripts/context.md), [workflows](../assets/workflows/overview.md), [HTTP](../triggers/http.md), [schedules](../triggers/schedules.md), [SQLite](../assets/resources/sqlite.md) and [CLI synchronization](../cli/sync.md). Unit fixtures cannot establish real scheduler identity/lease behavior, broker timeout/rollback behavior, publication or an external system's CDC/idempotency semantics; those require separately approved integration checks.
+
+## Verification basis
+
+Targeted source: `crates/viat-runtime/src/python.rs` (transaction/query/execute), `crates/viat-api/src/runner/broker.rs` (SQLite locking), and the CLI repo endpoint/resource serializers.

@@ -168,12 +168,14 @@ Writable transactions use BEGIN IMMEDIATE, holding the write lock throughout. Us
 
 General removal: disable callers, proxy/CRUD targets and related triggers, migrate dependencies and retain required evidence; then use `viat resource delete demo` or DELETE on the detail route. For 409 resource_in_use rebind/remove named endpoint holders first; do not bypass references. Removing an asset is not revoking third-party credentials, deleting external data or undoing prior side effects.
 
-## Related resources and maintenance evidence
+## Related resources
 
 - [PostgreSQL resource](postgresql.md)
 - [MySQL resource](mysql.md)
 - [Managed storage resource](storage.md)
 - [Resource overview](index.md)
+
+## Verification basis
 
 Pinned contract: `contracts/1.1.0/resources.json` → `resource.sqlite`。
 

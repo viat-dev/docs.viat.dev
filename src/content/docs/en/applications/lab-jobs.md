@@ -207,4 +207,8 @@ If separately opted-in schedules created another ID, inspect and remove only tha
 
 ## References and evidence
 
-[Repo sync](../projects/repo-sync.md), [authorization](../auth/authorization.md), [HTTP](../triggers/http.md), [schedules](../triggers/schedules.md), [workflows](../assets/workflows/overview.md), [PostgreSQL](../assets/resources/postgresql.md), [HTTP API resource](../assets/resources/http_api.md). Targeted source: `crates/viat-cli/src/repo/{viat_yaml.rs,endpoints.rs,schedules.rs}`, `crates/viat-api/src/{lib.rs,handlers/endpoints.rs}`, `crates/viat-runtime/src/{python.rs,annotations.rs}`. Local logic, integration/DB, scheduler and real-provider acceptance remain distinct layers. Offline unit validation passed; actual adapter/workflow/callback/provider integration remains unverified. See [verification status](../reference/validation.md).
+[Repo sync](../projects/repo-sync.md), [authorization](../auth/authorization.md), [HTTP](../triggers/http.md), [schedules](../triggers/schedules.md), [workflows](../assets/workflows/overview.md), [PostgreSQL](../assets/resources/postgresql.md), [HTTP API resource](../assets/resources/http_api.md). Local logic, integration/DB, scheduler and real-provider acceptance remain distinct layers. Offline unit validation passed; actual adapter/workflow/callback/provider integration remains unverified. See [verification status](../reference/validation.md).
+
+## Verification basis
+
+Targeted source: `crates/viat-cli/src/repo/{viat_yaml.rs,endpoints.rs,schedules.rs}`, `crates/viat-api/src/{lib.rs,handlers/endpoints.rs}`, `crates/viat-runtime/src/{python.rs,annotations.rs}`.

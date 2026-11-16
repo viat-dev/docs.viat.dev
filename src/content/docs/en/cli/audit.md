@@ -90,7 +90,7 @@ viat audit query demo_db --limit 10 --json
 
 **Failure handling, verification and cleanup.** Needs reachable PostgreSQL resource and installed/retained trail; a missing trail can be empty, not necessarily 404. Bad cursor/time or non-PostgreSQL fails. No writes/cleanup; output contains personal/business data.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

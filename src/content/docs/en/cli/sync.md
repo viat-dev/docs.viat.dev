@@ -152,7 +152,7 @@ viat push --only scripts,workflows
 
 **Failure handling, verification and cleanup.** Full metadata/settings changes can require project Owner/Admin; content-only stages need editor and some operational stages only membership. Refuses stale authz model before meta writes unless --force-authz; model/role deletions need --yes. These overrides are different and are not a general destructive-sync confirmation. Run diff and keep a complete backup before push; partial failure leaves prior stages applied. Pull/reconcile drafts, migrate DB explicitly, then publish intentionally.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

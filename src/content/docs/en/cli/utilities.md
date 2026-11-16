@@ -99,7 +99,7 @@ viat version
 
 **Failure handling, verification and cleanup.** Compare CLI/server minor versions before sync. Nothing to undo; the authenticated request may refresh the local session.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

@@ -9,11 +9,26 @@ contract_ids: ["cli.script.test", "cli.script.run", "cli.publish.apply"]
 
 # Offline fixtures and resource fakes
 
-Use `viat script test [path]` for local handler logic; [endpoint fixtures](endpoint-tests.md) add real HTTP dispatch, while [saved cases](saved-cases.md) run real resources on the server. Local tests need no project API authorization because they do not ask the server to execute the target. Possession of a checkout/database URL still grants local access; do not treat “test” as a privilege boundary or a guarantee direct network code is blocked.
+Three kinds of "test", one layer each — keep them apart:
 
-All examples are source-derived/unexecuted and synthetic. This documentation task installed/ran nothing. Supported test harnesses are Python/pytest, TypeScript/bun test and inline Rust cargo tests; the existence of nine production script languages does **not** imply nine equivalent offline SDKs.
+| Layer | Tool | Resources |
+| --- | --- | --- |
+| Local handler logic | `viat script test` (this page) | Fakes |
+| Full HTTP dispatch | [Endpoint fixtures](endpoint-tests.md) | Fakes + scratch instance |
+| Server publish gate | [Saved cases](saved-cases.md) | **Real resources** |
 
-## Prerequisites, discovery and results
+Local tests never call the server, so no project API authorization is needed;
+the checkout and database URLs are still local access capabilities, though.
+"test" is not a permission boundary, and it does not block your script's own
+network calls. Python/pytest, TypeScript/bun test and Rust inline cargo tests
+are supported — nine production languages do **not** mean nine equivalent
+offline SDKs.
+
+> [!NOTE]
+> Everything here is source-derived and unexecuted with synthetic data; this
+> task installed and ran nothing.
+
+## Setup, discovery, results
 
 ```sh
 viat script test
@@ -21,31 +36,57 @@ viat script test tests/echo
 viat script test --json
 ```
 
-Python uses uv to create an ephemeral environment with pytest and declared requirements. Tests live under tests, scripts under scripts. Use `load("folder/script")` for Python folder-aware relative-first `uses:` resolution and module isolation; flat import may select the wrong same-named common module. TypeScript uses bun test and discovers its normal .test.ts/.spec.ts patterns; its npm requirements must already be installed. The CLI temporarily injects node_modules/viat and refuses to overwrite an existing real one, then removes its injected SDK. Rust tests live in script .rs files under `#[cfg(test)]`, compiled in a temporary crate with the Viat SDK and declared deps; `VIAT_RUST_SDK_PATH`/toolchain must be available. Test host version must match CLI (`VIAT_TEST_HOST_BIN` override, sibling, PATH). Package setup may need registry/cache access even when upstream calls are faked.
+- **Python**: uv builds a temporary environment with pytest and your declared
+  dependencies; tests live in `tests`, scripts in `scripts`.
+  `load("folder/script")` resolves with Python's uses rules first and isolates
+  modules — a flat import can still pick the wrong same-named `common`.
+- **TypeScript**: discovery follows bun's `.test.ts`/`.spec.ts`; npm
+  dependencies must already be installed. The CLI injects `node_modules/viat`
+  temporarily, refuses to overwrite a real module, and removes the injected
+  SDK afterwards.
+- **Rust**: tests live in the script `.rs` under `cfg(test)` and compile in a
+  temporary crate with declared deps; `VIAT_RUST_SDK_PATH` and a toolchain are
+  required.
+- **The host version must match the CLI**, found via `VIAT_TEST_HOST_BIN`,
+  then next to the viat binary, then PATH. Faked upstreams do not guarantee
+  the package-preparation phase skips registries/caches.
 
-Mixed-language projects run each discovered suite, nonzero if any fails; do not inspect only the first suite's report. --json stdout is machine-readable but shape differs by language; runner output goes to stderr, **exit code is the reliable pass signal**. A missing interpreter/setup error is not validated coverage. `viat publish apply --require-tests` invokes these local tests first; it does not run endpoint fixtures automatically and does not replace server saved-case gates.
+Mixed projects run every language suite; any failure exits non-zero — do not
+stop at the first one. `--json` stdout shapes differ per language and runner
+output goes to stderr; **the exit code is the reliable signal**. A missing
+interpreter or failed initialization is not coverage. `viat publish apply
+--require-tests` runs these local tests first: it does not run endpoint
+fixtures automatically and does not replace the server-side case gate.
 
-## Complete fake surface
+## The full fake surface
 
-Python `ctx_with(request=?,principal=?,resources=?,project_users=?,authz=?,ws=?)` installs test context. TypeScript is async `await ctxWith({...})`, camelCase helpers. Set request/principal fields explicitly to prove a branch; omitted facts are not an authenticated production principal.
+Python installs context with
+`ctx_with(request=?,principal=?,resources=?,project_users=?,authz=?,ws=?)`;
+TypeScript uses async `await ctxWith({...})` with camelCase helpers. Test
+branches should set request/principal explicitly — omitting them is not "an
+authenticated production identity".
 
-| Fake | Backing / limits |
+| Fake | Backing and limits |
 | --- | --- |
-| `FakeHttp(cassette)` | http_api resource calls through real host request dispatch. |
-| `FakeGraphql(cassette)` | graphql document calls. |
-| `FakeCloud(cassette)` | cloud_api action calls. |
-| `FakeSecret(value)` | Synthetic secret value for get_resource/value; never use real credentials. |
-| `FakeConfig(dict)` | Local document; Python from_resource(name) loads `resources/<name>.yaml` plain.data, preserves written $secret placeholders. Endpoint fixture config override is **not** supported. |
-| `TestDb(url)` | Real scratch PostgreSQL SQL, one rollback transaction per test, not arbitrary database emulation. |
-| `FakeStorage(root?,prefix?,max_file_bytes?,allowed_types?)` | Temp directory/in-memory file metadata unless explicit root; same helper validation/error shapes, default deployment ceiling modeled as 100 MiB. URL is viat-test://, not a served signed link. No file authz/audit behavior. |
-| `FakeUpload(path,filename?,content_type?,field?)` | Local file handle in request.files, not an HTTP multipart parser. |
-| `FakeProjectUsers(initial,fail?)` | Separate project_users argument, not resource; records user state and injectable failures. Explicit principal is_admin false rejects; omit flag to leave fake ungated. Does not model all server role/escalation guards. |
-| `FakeAuthz(model)` | Separate authz argument; viat.yaml authz section/export/dict, evaluated by production policy engine. Principal identity/user_id/role/admin/meta/claims feed it; missing attrs fail closed. Not a fake “allow all”. |
-| `FakeWs(...)` | Python/TS local connection/room state and sent/closed records. Same UUID/code validation, no real socket; default empty fake makes sends false. Rust has ws event context but no equivalent connection fake. |
+| `FakeHttp(cassette)` | http_api calls go through the real host dispatch. |
+| `FakeGraphql(cassette)` | GraphQL documents. |
+| `FakeCloud(cassette)` | cloud_api actions. |
+| `FakeSecret(value)` | Synthetic value for get_resource/value; never real credentials. |
+| `FakeConfig(dict)` | Local document; Python `from_resource(name)` reads the resource YAML's plain.data, keeping `$secret` placeholders; endpoint fixtures do **not** support config overrides. |
+| `TestDb(url)` | A real scratch PostgreSQL, one rollback transaction per test; not a general DB simulator. |
+| `FakeStorage(root?,prefix?,max_file_bytes?,allowed_types?)` | Temporary directory/in-memory metadata by default (explicit root excepted); keeps validation/error shapes, models the 100 MiB deployment default; URLs are `viat-test://`, not real signed links; no file authz/audit. |
+| `FakeUpload(path,filename?,content_type?,field?)` | Local handle for `request.files`; not an HTTP multipart parser. |
+| `FakeProjectUsers(initial,fail?)` | A separate project_users argument, not a resource; inspect user state/inject failures; `principal is_admin false` refuses; omitted means the fake sets no admin gate and does not reproduce all role/elevation protections. |
+| `FakeAuthz(model)` | Separate authz argument; reads viat.yaml authz/export/dict and runs the **production policy engine**; principal identity/user_id/role/admin/meta/claims supply attributes; missing attributes fail closed, not allow-all. |
+| `FakeWs(...)` | Python/TS record connections/rooms/sends/closes locally with the same UUID/code checks; no real socket; the default fake is empty and send is false. Rust has a WS event context but no equivalent connection fake. |
 
-Unsupported resources/operations fail, not silently call real resources. Do not infer mysql, raw s3 or every resource kind is supported from production availability; the covered host paths include HTTP/GraphQL/cloud/secret/config/Postgres/storage. A transaction's .graphql and overlapping real-connection concurrency are not reproduced by TestDb.
+Unsupported resources/operations are meant to **fail**, not silently reach real
+ones; do not infer from a production kind that mysql, raw s3 or everything is
+fakeable. Covered: HTTP/GraphQL/cloud/secret/config/PostgreSQL/storage; TestDb
+does not reproduce transaction.graphql or concurrent overlapping independent
+connections.
 
-## Minimal handler and test
+## Minimal script and test
 
 ```python
 # scripts/echo.py
@@ -62,7 +103,9 @@ def test_echo():
     assert load("echo").main(name="Ada") == {"hello": "Ada"}
 ```
 
-For a handler that calls `ctx.resources.upstream.get("/thing/1")`, provide `FakeHttp("cassettes/upstream.yaml")`. The exact response expected by the SDK is the host wire response, not an invented requests.Response:
+If the handler calls `ctx.resources.upstream.get("/thing/1")`, provide
+`FakeHttp("cassettes/upstream.yaml")`; the expected object is the host's wire
+response, not an invented requests.Response:
 
 ```yaml
 interactions:
@@ -77,18 +120,63 @@ interactions:
       text: '{"id":1,"label":"synthetic"}'
 ```
 
-Cassette interaction fields: required op/name and appropriate response; match pins only listed request fields, omitted fields wildcard. HTTP matches method/path and optional query/body; GraphQL document and cloud action use their own call fields. `ignore` excludes volatile body keys before matching. Repeated matching calls consume responses **in order then repeat the last**; unmatched requests fail clearly. Tighten body/query when identical paths dispatch different operations, or separate scenario directories. A loose recording replaying successfully is not proof the correct operation matched.
+Cassette matching rules:
 
-## Rollback, side effects and cancellation limits
+- Each entry needs `op`/`name` plus its response; `match` pins only the listed
+  request fields — omitted fields are wildcards.
+- HTTP matches method/path plus optional query/body; GraphQL documents and
+  cloud actions use their own fields; `ignore` removes volatile body keys
+  before comparison.
+- Repeated matches are **consumed in order, then the last response repeats**;
+  no match fails explicitly.
+- Same path with different operations needs a pinned body/query or separate
+  scenario directories; a loosely recorded cassette replaying "successfully"
+  proves nothing about operation matching.
 
-TestDb requires a real scratch schema. Bare queries and transaction blocks share **one connection**. Script transactions become savepoints within the outer rollback transaction: nested/sequential atomic blocks can be tested, overlapping independent transactions cannot. A bare query inside an open block sees uncommitted block data here unlike production's separate connections. Rollback does not make production URLs safe: nontransactional/external effects and the wrong isolation assumptions remain dangerous.
+## Rollback, side effects, cancellation limits
 
-Offline ctx.tasks.enqueue records requests rather than scheduling: inspect ctx.tasks.enqueued in order; get reports queued records, cancel marks them cancelled. It validates one target/delay/range syntax, not whether targets exist or endpoint authorization would allow them. ctx.cache.purge records normalized GET paths in ctx.cache.purged, no real cache invalidation. A console Test run or endpoint-test path is not automatically this purely local task recorder. FakeWs acceptance is not real transport receipt; FakeStorage does not prove file permissions/audit.
+- **TestDb** needs a real isolated schema; bare queries and transaction blocks
+  share **one connection**. The script's transaction becomes a savepoint inside
+  the outer rollback transaction — order/nesting are testable, overlapping
+  independent transactions are not. Bare queries inside the block see
+  uncommitted writes; another connection in production may not. Rollback never
+  makes a production URL safe: non-transactional/external effects and
+  isolation assumptions remain dangerous.
+- **tasks**: offline `ctx.tasks.enqueue` records without scheduling;
+  `ctx.tasks.enqueued` is ordered, `get` reports queued, `cancel` marks
+  cancelled; target/delay/range syntax is checked, target existence and
+  endpoint authorization are not. Console Test/endpoint tests are not
+  automatically a pure local task recorder.
+- **cache**: `ctx.cache.purge` only records the normalized GET path in
+  `ctx.cache.purged`; nothing is actually purged.
+- **FakeWs** acceptance is not real delivery; **FakeStorage** proves nothing
+  about file authorization/audit.
 
-No harness cancellation/timeout makes committed external effects disappear. Keep deterministic small inputs, isolate explicit storage roots and DB schemas, inspect failure output, repair a fake/schema/setup before rerunning, and clean only artifacts you created. Never retry provider sends to “see whether the fake works”.
+No test timeout or cancellation undoes committed external effects. Use small
+deterministic inputs and isolated roots/DB schemas; read the failure, fix the
+fake/schema/setup, then rerun; clean up only what you created — never resend
+real messages "to see whether the fake works".
 
 ## Recording is a real run
 
-`viat script run <name> --args '<json>' --record cassettes/scenario/` invokes the real server/resources and captures HTTP/GraphQL/cloud interactions. It is not an offline capture. Each resource YAML is **overwritten**, not appended; use separate scenario directories. Request credentials applied by the platform and secret resources are not recorded, but **response bodies are verbatim**: OAuth responses or business records can contain secrets/personal data. Review/redact before committing and do not record secret-returning flows. Synchronous recording only; an async handle cannot return a complete cassette immediately. Recording authorization equals real draft-run authorization and carries its real effects.
+```sh
+viat script run <name> --args '<json>' --record cassettes/scenario/
+```
 
-Evidence: `crates/viat-runtime/src/testing.rs`, SDK Python/TypeScript/Rust testing helpers; `crates/viat-api/src/endpoint_test.rs`, `handlers/scripts.rs`; `crates/viat-cli/src/commands/script.rs` and local test runners. Runtime/DB/provider examples not executed; transport, provider quotas and real concurrent transaction behavior require separate verification.
+Recording issues **real server/resource requests** and captures
+HTTP/GraphQL/cloud interactions — it is not an offline operation. Each
+resource's YAML is **overwritten, not appended**; use one directory per
+scenario. Request credentials applied by the platform and secret resources are
+not recorded, but **response bodies are kept verbatim**: OAuth/business
+responses can contain tokens or personal data — review redaction before
+committing and never record flows that return secrets. Recording is
+synchronous only; an async handle cannot return a complete cassette
+immediately. Permissions and side effects equal a real draft run.
+
+## Verification basis
+
+Contract source `03751a67`: `crates/viat-runtime/src/testing.rs`, the
+Python/TypeScript/Rust SDK testing helpers; `crates/viat-api/src/endpoint_test.rs`
+and `handlers/scripts.rs`; `crates/viat-cli/src/commands/script.rs` and the
+local runner. No runtime/DB/provider examples were executed; real transports,
+quotas and concurrent transactions need separate verification.

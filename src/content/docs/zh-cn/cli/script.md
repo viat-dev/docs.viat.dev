@@ -405,7 +405,7 @@ viat script upload demo_binary --binary ./demo-worker --target linux/x86_64
 
 **失败处理、验证与清理。** 需服务端允许上传、匹配可执行格式及 binary manifest 脚本。语言错误/空文件/不支持目标会失败。show/build 核查后有意发布；回退需旧 manifest 和 artifact（show 不取字节）。
 
-## 实现核对依据
+## 核验依据
 
 语法来自固定 Clap 合同与 main.rs；行为/权限核对以下源文件，路径相对产品仓库根。
 

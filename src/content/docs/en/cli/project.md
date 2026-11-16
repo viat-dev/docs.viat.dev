@@ -325,7 +325,7 @@ viat project select cli-demo
 
 **Failure handling, verification and cleanup.** Unknown/inaccessible slug exits 1 and is not selected. Verify project list; select the previous slug to undo.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

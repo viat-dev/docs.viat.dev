@@ -162,12 +162,14 @@ Set explicit token, timeout, tool-iteration and spending budgets. Never place cr
 
 General removal: disable callers, proxy/CRUD targets and related triggers, migrate dependencies and retain required evidence; then use `viat resource delete demo` or DELETE on the detail route. For 409 resource_in_use rebind/remove named endpoint holders first; do not bypass references. Removing an asset is not revoking third-party credentials, deleting external data or undoing prior side effects.
 
-## Related resources and maintenance evidence
+## Related resources
 
 - [HTTP API resource](http_api.md)
 - [Config resource](config.md)
 - [Secret resource](secret.md)
 - [Resource overview](index.md)
+
+## Verification basis
 
 Pinned contract: `contracts/1.1.0/resources.json` → `resource.llm`。
 

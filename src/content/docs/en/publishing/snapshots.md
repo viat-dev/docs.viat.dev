@@ -9,35 +9,62 @@ contract_ids: ["cli.publish.plan", "cli.publish.apply", "cli.endpoint.publish"]
 
 # Published snapshots and gates
 
-Editing a script/endpoint does not change ordinary public calls until publication. The registry serves active immutable snapshots, refreshed across instances by database notification. Draft test runs are deliberately different. Publish/unpublish/rollback/cache purge and endpoint snapshot history require effective project **Owner/Admin** publish rights; Developer can edit, not publish. Project plan/history/show require membership (including Operator). A console token is not an end-user route credential.
+Publishing freezes an endpoint's draft state into an **immutable snapshot**, and
+public traffic reads that snapshot from then on — not your drafts. This page
+covers what exactly freezes, the complete management API, how warnings and
+saved regression cases gate a publish, and how to read build results.
 
-Examples below are source-derived/unexecuted. Publishing may run enabled saved cases against **real resources**, install dependencies/build workers, change routes and trigger cross-instance reloads; obtain explicit approval before doing it in a real project.
+Three sentences to start with:
+
+- Public calls read the active snapshot; editing drafts changes nothing online
+  until you publish again.
+- Publish/unpublish/rollback/cache purge and endpoint snapshot history need
+  effective project **Owner/Admin** rights; a Developer can edit but not
+  publish. plan/history/show only need project membership (Operator included).
+- A console token is not an end-user route credential.
+
+> [!WARNING]
+> Publishing may run enabled saved cases against **real resources**, install
+> dependencies, build workers, change routes and trigger cross-instance
+> reloads. Obtain explicit approval before running it in a real project. The
+> examples on this page are source-derived and unexecuted.
 
 ## What freezes and what remains live
 
 | Target/config | Publication boundary |
 | --- | --- |
-| Ordinary script endpoint | Main source/version/language/folder and input schema freeze. The complete `uses:` graph freezes **only if no `(live)` reference occurs anywhere in that graph**. Any live reference keeps the resolve-live path for the dependency graph; it does not freeze just the other branches. |
-| Workflow endpoint | Definition, step main script source/version/folder and nested workflow definitions/step main source freeze. **Step `uses:` dependencies remain live, including nested workflows.** Main-source freezing is not whole dependency freezing. |
-| Inbound WebSocket endpoint | Routes and their scripts freeze through script snapshot validation; not live outbound-subscription behavior. |
+| Ordinary script endpoint | Main source/version/language/folder and input schema freeze. The complete `uses:` graph freezes **only if no `(live)` reference occurs anywhere in that graph**; any live reference keeps the whole dependency graph on live resolution — it does not freeze just the other branches. |
+| Workflow endpoint | Definition, step main script source/version/folder and nested workflow definitions/step main source freeze. **Step `uses:` dependencies remain live, including nested workflows**; main-source freezing is not whole-graph freezing. |
+| Inbound WebSocket endpoint | Routes and their scripts freeze through script snapshot validation; live outbound-subscription behavior is different. |
 | CRUD | Author config and schema-resolved PK/selection/filter/writable types freeze. Resource credentials/schema health and live authz bindings/rules still matter. |
-| Proxy | Mount path, strip behavior and upstream bindings freeze; referenced http_api resource settings/credentials are resolved live. |
-| Auth/overrides | Effective authorizer **bindings**, gates, path/method, input/response overrides freeze. Authorizer configuration, users/roles/keys, authorization model and resources can still change live. Built-in native-auth code/hooks are not user script snapshots. |
-| Schedules/watches/IM/queues/outbound WS | Trigger config is live, not part of endpoint publication. Direct script/workflow triggers resolve live drafts. Schedule endpoint targets follow the published endpoint. |
+| Proxy | Mount path, strip behavior and upstream bindings freeze; referenced http_api settings/credentials resolve live. |
+| Auth/overrides | Effective authorizer **bindings**, gates, path/method, input/response overrides freeze. Authorizer configuration, users/roles/keys, the authorization model and resources stay live. Built-in native-auth code/hooks are not user script snapshots. |
+| Schedules/watches/IM/queues/outbound WS | Trigger config is live and not part of endpoint publication. Direct script/workflow triggers resolve live drafts. Schedule endpoint targets follow the published endpoint. |
 
-Thus rollback cannot undo resource rotation, DB schema/data, live workflow modules, provider changes or messages already sent. Conversely, ordinary frozen script modules must be republished to change, unless the graph intentionally opts into live dependencies. Source/export repos represent **drafts**, not a portable export of the active immutable snapshots.
+Two conclusions people get wrong most often:
 
-## Plan and project apply
+- **Rollback does not undo** resource rotation, database schema/data, live
+  workflow modules, provider state, or messages already sent.
+- Source/export repositories represent **drafts**, not a portable export of the
+  active snapshots; changing a frozen module needs a new publish unless it is
+  deliberately live.
 
-`GET /projects/<slug>/publish/plan` returns `project_slug,publishable_count,endpoints`. Each endpoint item contains `id,tree_name,method,path,current_status,target_kind,target_name,current_version,draft_version,diff_summary`; proxy method/current absent version may be null. The server heals stale dependency-closure dirty markers while making the plan; it activates no route. It is not a lock/reservation or a promise apply will see identical drafts.
+## Plan and project-level apply
 
-Source-derived plan response example:
+`GET /projects/<slug>/publish/plan` returns `project_slug/publishable_count/
+endpoints`; each entry carries `id, tree_name, method, path, current_status,
+target_kind, target_name, current_version, draft_version, diff_summary`
+(method null for proxy entries, versions null when none existed). The server
+repairs stale dirty flags across the dependency closure but enables no routes;
+a plan is neither a lock nor a reservation — apply may see different drafts.
+
+Source-derived response example:
 
 ```json
 {"project_slug":"demo","publishable_count":1,"endpoints":[{"id":"00000000-0000-4000-8000-000000000001","tree_name":"default","method":"GET","path":"/hello","current_status":"unpublished","target_kind":"script","target_name":"echo","current_version":null,"draft_version":1,"diff_summary":"new endpoint"}]}
 ```
 
-`POST /projects/<slug>/publish/apply` accepts an optional body:
+`POST /projects/<slug>/publish/apply` takes an optional body:
 
 ```http
 POST /projects/demo/publish/apply
@@ -47,34 +74,78 @@ Content-Type: application/json
 {"acknowledge_warnings":false,"acknowledge_test_failures":false}
 ```
 
-Both fields default false when body/field is absent; booleans are not nullable clear operations. Apply publishes **all publishable dirty/unpublished leaves** as one transaction/revision, not arbitrary script drafts and not only the endpoint you last edited. Empty work returns a zero-count response without a new revision. No server `require_tests` field exists; that is a local CLI option.
+A missing body or field means `false`; booleans cannot be cleared with null.
+apply publishes **all** publishable dirty/unpublished leaves in one
+transaction/revision — not arbitrary script drafts, and not only the most
+recently edited one. An empty job publishes zero items and creates no
+revision. The server has no `require_tests` field; that is a local CLI option.
 
 ```json
 {"project_slug":"demo","published_count":1,"endpoints":[{"id":"00000000-0000-4000-8000-000000000001","method":"GET","path":"/hello","snapshot_id":"00000000-0000-4000-8000-000000000003","snapshot_version":1}],"builds":[{"script":"echo","language":"python","ok":true,"error":null,"duration_ms":42}],"build_pending":false}
 ```
 
-`builds` rows have script/language/ok/error/duration_ms and optional nonempty Rust diagnostics; build_pending true means background builds, typically with empty builds. A 200 is route activation success, **not proof every environment is ready**.
+Each `builds` row has `script/language/ok/error/duration_ms`, with possibly
+non-empty Rust diagnostics in error; `build_pending: true` means a background
+build, in which case builds is usually empty. HTTP `200` means the routes were
+enabled — it **does not** prove every environment is ready.
 
-## Per-endpoint publication and full snapshot response
+## Single-endpoint publish and the full snapshot response
 
-`POST /projects/<slug>/endpoints/<id>/publish` uses the same optional two flags and publishes just that leaf, returning a different success shape:
+`POST /projects/<slug>/endpoints/<id>/publish` accepts the same two optional
+flags, publishes only that leaf, and answers with a different shape:
 
 ```json
 {"snapshot":{"id":"00000000-0000-4000-8000-000000000003","node_id":"00000000-0000-4000-8000-000000000001","version":1,"method":"GET","path_pattern":"/hello","target_kind":"script","script_name":"echo","script_version":1,"workflow_name":null,"workflow_version":null,"proxy_resource_name":null,"created_by":"00000000-0000-4000-8000-000000000004","created_at":"2026-11-06T00:00:00Z"},"builds":[],"build_pending":false}
 ```
 
-This **complete SnapshotView** intentionally excludes source, workflow definition, step blobs, credentials and override internals. It is also the shape in endpoint history and per-endpoint rollback. `version` is endpoint snapshot version, not script version/server release. CRUD/WS targets have their own target_kind while ordinary script/workflow name fields can be null.
+This is the **full SnapshotView**: it deliberately omits source, workflow
+definitions, step blobs, credentials and override internals; endpoint history
+and single-endpoint rollback use the same shape. `version` is the endpoint
+snapshot version — not a script or server release. CRUD/WS entries have their
+own target_kind; ordinary script/workflow names may be null.
 
-## Warning, regression and build gates
+## Warnings, regression and build gates
 
-Both routes enforce warnings **first**, then saved-case regression, before snapshot commit. Failure rolls back snapshot/revision writes, **not side effects from tests already run**.
+Both publish routes check **warnings first, then saved-case regression** before
+committing; a failure rolls back the snapshot/revision write but **not** any
+external side effects of tests already executed.
 
-- **409 publish_warnings_unacknowledged**: per-endpoint returns `warnings:[strings]`; project apply returns `endpoint_warnings:[{endpoint_id,path,warnings}]`. Read each warning; acknowledge_warnings true bypasses this warning gate, not hard validation or test failures. Warnings are recorded on revision detail. Missing target/reserved paths/invalid bindings/schema/auth capabilities may be hard errors that acknowledgement cannot waive.
-- **409 publish_test_failures**: both return `error,message,test_results`. Each result names case/target_kind/target and outcome passed/failed/errored/skipped. Per-endpoint covers that leaf; project apply covers targets actually going live. Workflow baked step scripts/nested scripts are included; current target collector does **not enumerate WS route scripts**. Budget defaults 120s (1–3600), stops starting additional cases, skipped blocks. Loading cases can currently fail open with an error log; a green response is not proof cases ran.
-- `acknowledge_test_failures:true` skips the regression pass entirely, not merely turns red results into warnings; separate deliberate emergency override. Tests run **drafts/current environments**, not a post-build snapshot traffic simulation. Streaming has no saved comparable body; explicit response cases compare the body. See [saved cases](../testing/saved-cases.md).
-- Default build validation occurs after commit/registry swap and reports failures without undoing activation. `VIAT_PUBLISH_BUILD_ASYNC` permits background warmup. `VIAT_PUBLISH_BUILD_BLOCK` opts into **precommit project-wide build refusal** and forces synchronous behavior; a failing unrelated project script can therefore block a narrow endpoint publish. Rust build availability/artifact configuration can affect what a node validates. These are deployment settings, not request flags.
+**`409 publish_warnings_unacknowledged`** — the single-endpoint route returns a
+warnings string array; project apply returns
+`endpoint_warnings:[{endpoint_id,path,warnings}]`. Read them one by one;
+`acknowledge_warnings: true` clears the warning layer only, never hard
+validation or tests. Warnings are recorded in the revision detail. Missing
+targets, reserved paths, bindings, schema or auth-capability violations are
+**non-acknowledgeable** errors.
 
-For cold/failed environments inspect script env/build error (and Rust diagnostics), repair dependencies/toolchain/artifact availability, then deliberately rebuild/publish as applicable. A CLI success alone does not prove readiness. Do not repeatedly acknowledge a missing-main/schema warning to suppress a real deployment defect.
+**`409 publish_test_failures`** — both return `error/message/test_results`;
+each result is `case/target_kind/target/outcome`
+(passed/failed/errored/skipped). The single-endpoint route covers that leaf;
+project apply covers the targets actually going live, including workflow
+frozen steps and nested scripts; the current collector **does not enumerate WS
+route scripts**. The test budget defaults to 120 seconds, range 1–3600; a
+timeout stops starting new cases; `skipped` also blocks. Failing to load a
+case is currently logged and skipped past — a **green response does not prove
+tests ran**.
+
+`acknowledge_test_failures: true` skips the pass decision outright — it does
+not downgrade red to a warning; treat it as an independent emergency decision.
+Tests run against the **draft/current environment**, not a post-build traffic
+simulation; streams have no single comparable body — the comparison rules for
+explicit response cases are in [saved cases](../testing/saved-cases.md).
+
+> [!NOTE]
+> Default build verification runs **after** commit/registry swap: failures are
+> reported but the publication stands. `VIAT_PUBLISH_BUILD_ASYNC` moves warmup
+> to the background; `VIAT_PUBLISH_BUILD_BLOCK` enables **pre-commit
+> whole-project build rejection** and forces synchronous builds — an
+> unrelated script's failure can then block a single-endpoint publish. Rust
+> compilation capability and artifact configuration decide what a node can
+> verify; they are deployment settings, not request flags. For cold/failing
+> environments read the script env/build errors and Rust diagnostics, fix
+> dependencies/toolchain/artifacts, then rebuild or republish deliberately —
+> do not repeatedly acknowledge missing-main/schema warnings to hide a
+> deployment defect.
 
 ## CLI, verification and cleanup
 
@@ -84,10 +155,37 @@ viat publish apply --require-tests --yes --json
 viat endpoint publish 00000000-0000-4000-8000-000000000001
 ```
 
-Use returned ids from an isolated project, not these synthetic ids. `--require-tests` runs **local script tests**, not endpoint fixtures, before the remote apply. --json suppresses the apply confirmation and exposes raw responses/refusals; ordinary non-2xx fails. Accepted publish with failed/pending builds can still exit 0. Per-endpoint CLI has a narrower acknowledgement surface than API; use only documented flags in [CLI publish](../cli/publish.md)/[CLI endpoint](../cli/endpoint.md), never guess `--force`.
+Use ids returned by your isolated project; never the example UUIDs.
+`--require-tests` first runs **local script tests** (not endpoint fixtures);
+`--json` drops the interactive confirmation and prints the raw success or
+rejection body, exiting non-zero on ordinary non-2xx — though "published with
+build failure/pending" can still exit 0. The single-endpoint CLI has a narrower
+acknowledgement surface than the API: use only the documented flags from
+[CLI publish](../cli/publish.md) and [endpoint](../cli/endpoint.md); there is
+no `--force`.
 
-After apply inspect project history/show, per-endpoint snapshot version, build/env readiness, allowed and denied callers and an authorized public smoke request. Cross-instance notification convergence is not a globally atomic traffic cutover; requests already running keep their start payload. Cancellation/disconnect cannot undo prior commits. If the result is uncertain after a timeout, inspect history/current snapshot before retrying; publish is not keyed by Idempotency-Key and retry can create another revision or see no dirty work.
+After publishing, verify:
 
-To stop new ordinary traffic use `POST …/endpoints/<id>/unpublish` → `{"unpublished":true}`; it preserves history, not an undo of runtime effects, and system-managed auth leaves refuse it. Delete isolated endpoints only after pending work/external data is accounted for. Use [rollback](rollback.md) for routing recovery and [promotion](promotion.md) for another environment.
+- snapshot versions and build/env state in history/show;
+- one allowed and one rejected public smoke call.
 
-Evidence: `crates/viat-api/src/handlers/{publish,snapshots}.rs`, `registry.rs`, `regression.rs`, runner dependency resolution; `crates/viat-core/src/types/snapshot.rs`; `crates/viat-db/src/{snapshots,revisions}.rs`; CLI publish/endpoint code. Examples unexecuted; no builds, tests, registry reloads or provider calls performed here.
+Cross-instance notification convergence is not a global atomic traffic switch:
+in-flight requests keep the payload they started with; cancellation or
+disconnect does not undo committed side effects. After an ambiguous timeout,
+check history/current snapshot before retrying — publish does not deduplicate
+by an Idempotency-Key, so a retry may create a new revision or do nothing.
+
+`POST …/endpoints/<id>/unpublish` answers `{"unpublished":true}`: new ordinary
+traffic stops, history remains, already-produced effects are not undone;
+built-in auth leaves refuse. Handle pending work and external data before
+deleting an isolated endpoint.
+
+For restoring routes see [rollback](rollback.md); for cross-environment flows
+see [promotion](promotion.md).
+
+## Verification basis
+
+Contract source `03751a67`: `crates/viat-api/src/handlers/{publish,snapshots}.rs`,
+registry.rs, regression.rs and runner dependency resolution;
+`crates/viat-core/src/types/snapshot.rs`; `crates/viat-db/src/{snapshots,revisions}.rs`;
+CLI publish code. Examples unexecuted; nothing built, tested, reloaded or called.

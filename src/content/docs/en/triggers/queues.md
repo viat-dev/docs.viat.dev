@@ -9,11 +9,25 @@ contract_ids: []
 
 # RabbitMQ queue triggers
 
-A queue trigger consumes an existing RabbitMQ queue through a project **amqp** resource and runs a live script/workflow per delivery. No endpoint targets, RocketMQ/MQTT connector or publish step. Every queue-trigger management/read/fire-history API requires project **content-edit rights**, unlike the membership-only schedule/watch APIs. Broker topology, publish routing, durability, DLX/DLQ, delivery limits and consumer timeout are operator responsibilities; saving a trigger does not create or test the queue.
+A queue trigger consumes an existing RabbitMQ queue through a project
+**amqp** resource and runs a live script/workflow per delivery. There is no
+publish step, no endpoint target and no RocketMQ/MQTT connector — those need
+explicit adapters.
 
-## Complete creation and response
+Three boundaries to start with:
 
-Source-derived/unexecuted example; first create amqp resource `mq`, existing broker queue `demo.incoming`, and `ingest` script:
+- Every management/read/fire-history API requires project **content-edit
+  rights** — unlike the membership-only schedule/watch APIs.
+- Broker topology, routing, durability, DLX/DLQ, delivery limits and consumer
+  timeout belong to broker operations; **saving a trigger neither creates
+  nor tests the queue**.
+- Executions run as the queue-trigger system principal, not the HTTP caller;
+  resource authorization and target timeouts still apply.
+
+## Full create and response
+
+Source-derived, unexecuted. First create the amqp resource `mq`, the broker
+queue `demo.incoming` and the script `ingest`:
 
 ```python
 def main(message, message_meta):
@@ -28,46 +42,95 @@ Content-Type: application/json
 {"resource":"mq","queue":"demo.incoming","max_concurrent_runs":1,"ack_deadline_override":false,"target":{"kind":"script","name":"ingest"},"inputs":{},"enabled":false}
 ```
 
-The name is in the **path**, not a required body field. Create/update return the row; list/show additionally expose recent_fires. Row example:
+The name rides in the **path**, not the body. Create/update returns the row
+(list/detail additionally carry recent_fires):
 
 ```json
 {"id":"00000000-0000-4000-8000-000000000001","project_id":"00000000-0000-4000-8000-000000000002","name":"incoming","enabled":false,"resource":"mq","queue":"demo.incoming","max_concurrent_runs":1,"ack_deadline_override":false,"target_kind":"script","target_name":"ingest","inputs":{},"created_at":"2026-11-06T00:00:00Z","updated_at":"2026-11-06T00:00:00Z"}
 ```
 
-| Field | Default / constraints |
+| Field | Default/limits |
 | --- | --- |
-| `resource` | Required project amqp resource, qualified name allowed; credentials stay platform-side. |
-| `queue` | Required, nonblank, <=255 bytes, no control characters; passively consumed, broker owns declaration. |
-| `max_concurrent_runs` | 1; integer 1–16, also broker prefetch. |
-| `ack_deadline_override` | false; explicitly bypasses save-time timeout safety check, not a broker timeout change. |
-| `target` | Existing `{kind:script|workflow,name:"folder/name"}`. |
-| `inputs` | Defaults null; runtime merges object constants. Prefer explicit `{}`. Reserved message/message_meta overwrite constants. |
-| `enabled` | API/repo default **true**, including full PUT. **Console new form defaults paused/false**. Send false through API to stage safely. |
-| `expected_updated_at` | Optional/null unconditional update; PUT precondition uses exact returned timestamp including fractional seconds. Mismatch is 409 with no fields applied. Not needed on create. |
+| `resource` | Required; a project amqp resource name, folder allowed; credentials stay platform-side. |
+| `queue` | Non-blank, ≤255 bytes, no control characters; **passive** consumption — the broker owns declarations. |
+| `max_concurrent_runs` | Default 1; integer 1–16; doubles as the broker prefetch. |
+| `ack_deadline_override` | Default false; bypasses the save-time timeout safety check and **never modifies the broker**. |
+| `target` | An existing `{kind:script\|workflow,name:"folder/name"}`. |
+| `inputs` | Default null; object constants merged at runtime. Prefer `{}` — kept message/message_meta names override same-named constants. |
+| `enabled` | API/repo and full-PUT default **true**, but **the console creates paused (false)**; staged API creation must send false explicitly. |
+| `expected_updated_at` | Optional/null: unconditional update; a PUT should echo the returned timestamp with fractional seconds; a mismatch answers 409 and applies **no field**; not needed on create. |
 
-`PUT …/queue-triggers/<name>` replaces all config, resets omitted optional fields to defaults; required fields cannot be null. Use `POST …/<name>/enabled {"enabled":false}` for a narrow emergency pause, avoiding stale full-form overwrite. The console includes expected_updated_at when saving; on conflict reopen current data and intentionally merge, never blindly drop the precondition. Edits/enabled changes reconcile in about ten seconds and execution config changes restart the consumer; already running deliveries retain their start configuration.
+`PUT …/queue-triggers/<name>` fully replaces: omitted optionals revert to
+defaults, required fields cannot be null. For an emergency pause use
+`POST …/<name>/enabled {"enabled":false}` instead of a stale full form. The
+console saves with expected_updated_at; on conflict, reopen the current data
+and merge deliberately — never blindly drop the precondition. Changes
+reconcile within ~10 seconds; execution-config changes restart the consumer,
+while in-flight deliveries keep their startup configuration.
 
-## Ack deadline and actual delivery contract
+## Ack deadline and real deliveries
 
-Save rejects resource missing/wrong kind, nonexistent target, invalid queue/concurrency, or deployment `VIAT_MAX_ASYNC_TIMEOUT_SECS` (default 1800) exceeding `VIAT_QUEUE_ACK_DEADLINE_SECS` (default 1500), unless override true. Thus untouched deployment defaults can **refuse** a new trigger: raise ack deadline to match the real broker consumer_timeout, lower runtime ceiling, or explicitly override after verifying broker settings. Otherwise a long execution may be redelivered while it is still running. Override does not prevent duplicates.
+Save-time rejections: missing/wrong-typed resource, missing target, invalid
+queue/concurrency, or a deployment where
+`VIAT_MAX_ASYNC_TIMEOUT_SECS` (default 1800) exceeds
+`VIAT_QUEUE_ACK_DEADLINE_SECS` (default 1500) — unless override is true.
 
-Args are `message` (JSON-decoded body; non-JSON becomes `{raw_body_b64:"…"}`), `message_meta:{message_id,routing_key,redelivered}`, plus constants. Runs use the queue-trigger system principal, not an HTTP caller. Resource authorization and target timeout still apply. There is **no dedup ledger**: delivery is at-least-once and scripts must tolerate duplicates, even with message_id present.
+> [!WARNING]
+> An all-defaults deployment may therefore be **unable to save** a new
+> trigger. Raise the deadline or lower the runtime ceiling per the broker's
+> real consumer_timeout, or verify the broker and override deliberately. A
+> still-running long task can still get redelivered — **the override does not
+> prevent duplicates**.
+
+Script parameters: `message` (JSON-parsed; non-JSON arrives as
+`{"raw_body_b64":"…"}`), `message_meta`
+(`message_id,routing_key,redelivered`), plus constants. **There is no
+deduplication ledger**: delivery is at-least-once, and business logic must be
+idempotent even with a message_id.
 
 | Run outcome | Broker action |
 | --- | --- |
 | Success | ack. |
-| Script refusal/client-error classification | nack with requeue false: dead-letter if broker DLX is configured, otherwise message can be discarded. |
-| Timeout, overload, transport/internal/server failure | nack with requeue true. Broker delivery policy bounds poison loops; Viat does not provide a universal retry count/backoff. |
-| Missing project/deleted or unresolvable target | ack with recorded config-error reason, avoiding an endless requeue storm. Repair config does not resurrect this acknowledged delivery. |
+| Script rejection / client-error classification | nack, requeue=false; dead-letters via a configured DLX, otherwise possibly dropped. |
+| Timeout, overload, transport/internal/server failure | nack, requeue=true; the broker's redelivery policy bounds the poison loop — Viat has no generic retry count/backoff. |
+| Project missing, target deleted/unresolvable | **ack with a logged config error** (avoiding infinite requeue); fixing the config revives no already-acked message. |
 
-Broker acknowledgement failure/connection loss can redeliver after the side effect succeeded. Fire history is observability, not authoritative broker state. Do not claim that absence of DLQ always retains refused messages. A script's explicit HTTP-like response is not a substitute for understanding the runner's error classification; use refusal/error APIs intentionally.
+A side effect succeeding but the ack failing/disconnecting still allows
+redelivery; fire history is observability, not broker truth. Never claim a
+rejected message is preserved without a DLQ; an explicit HTTP-style response
+does not replace the runner's error classification — use the rejection/error
+APIs properly.
 
-## Ordering, backpressure, operations and cleanup
+## Ordering, backpressure, operations, cleanup
 
-The concurrency semaphore and basic_qos prefetch share the configured limit. At 1, one consumer handles messages one-at-a-time. With several Viat instances/other consumers, configure **x-single-active-consumer:true** on the broker queue if global ordered handling matters; concurrency 1 alone is not a cross-consumer total order. Above 1 completion order can differ. Requeue/reconnect can alter arrival order even in a serial flow. The broker arbitrates consumers, not a Viat claim ledger.
+- The concurrency semaphore and `basic_qos` prefetch share the limit: 1 means
+  one consumer processing sequentially; for a global order across multiple
+  Viat instances/other consumers, configure
+  **`x-single-active-consumer:true`** on the broker — "concurrency 1" alone
+  is not a cross-consumer total order. Above 1, completions can reorder;
+  requeue/reconnect can reorder arrivals even when serial — the broker
+  arbitrates, not a Viat claim ledger.
+- Observability: `GET /projects/<slug>/queue-triggers`, `GET …/<name>` and
+  `GET …/<name>/fires`. A fire carries
+  `id,trigger_id,execution_id,message_id,routing_key,redelivered,outcome,detail,fired_at`
+  with outcome ack/dlq/requeue. Read them **together with** broker
+  ready/unacked counts, dead-letter routing and runtime logs. Connection
+  errors reconnect with backoff; missing permissions/queues are fixed at the
+  broker, not by recreating triggers.
+- Tooling: there is no standalone queue-trigger CLI; the repo supports
+  `queue_triggers/<name>.yaml` and `viat pull/push --only queue_triggers`.
+  Mirroring deletes remote items missing locally — diff first.
+- Verify and clean up: exercise success/rejection/timeout/redelivery only on
+  an authorized isolated queue/DLQ; pause first, drain in-flight/unacked
+  work, then `DELETE` the trigger — which **never** deletes or empties the
+  broker queue, redelivers acked messages or undoes writes. Manual DLQ
+  replay needs separate authorization and business deduplication;
+  cancelling/pausing is not a transaction rollback.
 
-`GET /projects/<slug>/queue-triggers`, `GET …/<name>`, `GET …/<name>/fires` show config and delivery history. Each fire has `id,trigger_id,execution_id,message_id,routing_key,redelivered,outcome,detail,fired_at`, outcome ack/dlq/requeue. Check broker unacked/ready counts, dead-letter routing and runtime logs together. Connectivity failures back off/reconnect; missing broker permissions/queue are operator repairs, not reasons to repeatedly recreate the trigger.
+## Verification basis
 
-No standalone queue-trigger CLI commands: `queue_triggers/<name>.yaml` and `viat pull/push --only queue_triggers` are supported. Mirror push can remove remote triggers absent locally, so review diff. Test only with an explicitly authorized isolated queue/DLQ: success, refusal, timeout and redelivery. Pause before cleanup, account for in-flight/unacked work, then DELETE the trigger. This does not delete/purge broker queues, requeue acknowledged messages or undo external writes. Manual DLQ replay needs separate approval and business deduplication; cancellation/pause is not transactional rollback.
-
-Evidence: `crates/viat-api/src/handlers/queue_triggers.rs`, `queue_trigger.rs`; `crates/viat-core/src/types/queue_trigger.rs`; `crates/viat-cli/src/repo/queue_triggers.rs`; console queue trigger editor/tests. Examples source-derived/unexecuted, no broker/network call performed.
+Contract source `03751a67`: `crates/viat-api/src/handlers/queue_triggers.rs`
+and `queue_trigger.rs`; `crates/viat-core/src/types/queue_trigger.rs`;
+`crates/viat-cli/src/repo/queue_triggers.rs`; the console queue editor and
+its tests. Examples are source-derived and unexecuted; no broker/network
+calls were made.

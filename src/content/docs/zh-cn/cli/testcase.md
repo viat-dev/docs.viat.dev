@@ -270,7 +270,7 @@ viat testcase update 00000000-0000-4000-8000-000000000001 --expected '{"ok":true
 
 **失败处理、验证与清理。** JSON/match/无选项会失败；保存旧 expected/args，避免误改削弱门槛。show 核查；再 update 旧值回退。
 
-## 实现核对依据
+## 核验依据
 
 语法来自固定 Clap 合同与 main.rs；行为/权限核对以下源文件，路径相对产品仓库根。
 

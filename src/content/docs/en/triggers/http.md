@@ -9,13 +9,26 @@ contract_ids: []
 
 # HTTP endpoints and dispatch
 
-A client calls `/p/<slug>/<path>`. Management uses `/projects/<slug>/endpoints`; a console access token/PAT is not automatically an endpoint credential. Endpoint creation/editing requires a project role with content-edit rights; publishing requires publish rights. Caller access is independently determined by the **published** authorizers and authorization gates. Branches organize paths; ordinary leaves bind one script or workflow and one HTTP method. [CRUD](crud.md), [inbound WebSocket](websocket-endpoints.md) and proxy mounts are distinct target kinds.
+Clients call `/p/<slug>/<path>`; management lives at
+`/projects/<slug>/endpoints` — the two are not interchangeable. Branches
+organize paths; an ordinary leaf binds one script/workflow and one HTTP
+method; [CRUD](crud.md), [inbound WebSocket](websocket-endpoints.md) and
+proxy mounts are distinct target kinds.
 
-All examples below are source-derived and **unexecuted**, using synthetic data. They are instructions for an isolated project, not evidence of a live deployment.
+Three permission layers — keep them apart:
 
-## Create and read
+- Create/edit: project content-edit rights.
+- Publish: project publish rights.
+- Actual calls: decided solely by the **published** authorizers and gates — a
+  console access token/PAT is not automatically an endpoint credential.
 
-First create a script named `echo` with this source (for example `scripts/echo.py` in a repo, then `viat push`).
+> [!NOTE]
+> All examples here are source-derived, use synthetic data and are
+> **unexecuted**; work in an isolated project.
+
+## Create, read, call
+
+First create the script `echo` (repo `scripts/echo.py`) and `viat push`:
 
 ```python
 def main(name: str = "world"):
@@ -30,85 +43,211 @@ Content-Type: application/json
 {"segment":"hello","method":"GET","script_name":"echo","allowed_authorizers":["public"],"overrides":{"query_params":{"name":{"type":"string","default":"world"}},"strict":true}}
 ```
 
-Use the project's actual public authorizer name, not a guessed one. The creation response is the endpoint view, for example (projection; unrelated optional fields omitted):
+Replace `public` with your project's actual public authorizer name — do not
+guess. Creation returns an endpoint view (projection with unrelated optional
+fields omitted):
 
 ```json
 {"id":"00000000-0000-4000-8000-000000000001","tree_id":"00000000-0000-4000-8000-000000000002","parent_id":null,"segment":"hello","method":"GET","script_name":"echo","workflow_name":null,"path":"/hello","allowed_authorizers":["public"],"authz_gates":null,"override_authorizers":false,"override_permissions":false,"published_snapshot_id":null,"draft_dirty":false,"status":"unpublished","overrides":{"query_params":{"name":{"type":"string","default":"world"}},"strict":true}}
 ```
 
-Read the saved id with `GET /projects/demo/endpoints/<id>`. Publish using `POST …/endpoints/<id>/publish` with `{}`; then `GET /p/demo/hello?name=Ada` produces `{"hello":"Ada"}`. Record the publish response and check the public route, not only the editor test. See [snapshots](../publishing/snapshots.md) for gates and output.
+Then: read `GET /projects/demo/endpoints/<id>` with the returned id; publish
+with `POST …/endpoints/<id>/publish` (body `{`); `GET /p/demo/hello?name=Ada`
+should answer `{"hello":"Ada"}`. Keep the publish response and actually call
+the public route — **never trust only the editor test**. Publish gates and
+outputs: [snapshots](../publishing/snapshots.md).
 
 ## Creation fields
 
 | Field | Meaning and default |
 | --- | --- |
-| `tree_id` | Optional UUID; omitted/null selects the default tree. |
-| `parent_id` | Optional UUID in the selected project/tree; omitted/null creates a root. |
-| `segment` | Required path segment; `:name` declares a path parameter. Server validates reserved paths and collisions. |
-| `method` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`; absent/null creates a branch unless another target kind supplies its own semantics. |
-| `script_name`, `workflow_name` | Optional qualified `folder/name`; mutually exclusive with each other and proxy/CRUD/WS bindings. Target must exist. |
-| `proxy_resource_name` | Optional `http_api` resource; a proxy mount must have no method. |
-| `proxy_strip_prefix` | Boolean, default `true`. |
-| `proxy_upstreams` | Optional value → qualified `http_api` resource map; requires exactly one path parameter across the mount path. Unmapped values use the default upstream. |
-| `crud_resource_name`, `crud_config` | PostgreSQL CRUD binding; see [CRUD](crud.md). |
-| `ws_config` | Inbound WebSocket binding; see [WebSocket endpoints](websocket-endpoints.md). |
-| `allowed_authorizers` | List of authorizer names; absent/null inherits. The nearest declaration replaces ancestors rather than accumulating. |
-| `authz_gates` | List of `{type,action}`; absent/null inherits. Gates accumulate up the tree until `override_permissions` stops the walk. |
-| `override_authorizers`, `override_permissions` | Default `false`; explicitly control inheritance boundaries. |
-| `required_permissions` | Retired: nonempty lists are rejected, an empty list is a no-op. Use gates. |
-| `overrides` | Optional contract/dispatch object, detailed below; absent/null means no endpoint overrides. `{}` is an explicitly present override layer. |
-| `path_override` | Optional full leaf path; invalid on branches. |
+| `tree_id` | Optional UUID; omitted/null uses the default tree. |
+| `parent_id` | Optional UUID within the chosen project/tree; omitted/null creates a root node. |
+| `segment` | Required path segment; `:name` declares a path parameter; reserved paths and conflicts are server-checked. |
+| `method` | `GET`/`POST`/`PUT`/`PATCH`/`DELETE`; omitted/null usually creates a branch, special targets differ. |
+| `script_name`, `workflow_name` | Optional `folder/name`, mutually exclusive and exclusive vs proxy/CRUD/WS bindings; the target must exist. |
+| `proxy_resource_name` | Optional `http_api` resource; proxy mounts set no method. |
+| `proxy_strip_prefix` | Defaults to `true`. |
+| `proxy_upstreams` | Optional "path-parameter value → fully qualified http_api resource" map; the whole mounted path must have exactly one path parameter; unmapped values use the default upstream. |
+| `crud_resource_name`, `crud_config` | PostgreSQL CRUD binding, see [CRUD](crud.md). |
+| `ws_config` | Inbound WebSocket binding, see [WebSocket endpoints](websocket-endpoints.md). |
+| `allowed_authorizers` | Authorizer names; omitted/null inherits; the nearest declaration **replaces** ancestor lists — no accumulation. |
+| `authz_gates` | `{type,action}` list; omitted/null inherits; **accumulates** down the tree until `override_permissions` cuts it off. |
+| `override_authorizers`, `override_permissions` | Default `false`; set explicitly to bound inheritance. |
+| `required_permissions` | Retired: non-empty rejected, empty no-op; use gates. |
+| `overrides` | The contract object below; omitted/null means no override layer; `{}` is an explicitly present one. |
+| `path_override` | Optional full leaf path; not for branches. |
 
-`PUT …/endpoints/<id>/info` is partial: absent fields keep their values; explicit null clears `method`, `script_name`, `workflow_name`, `overrides`, `path_override`, subject to binding invariants. `segment:null` does not clear the segment. `crud_config` and `ws_config` replace entire objects on matching target kinds; null/omission is not a clearing operation. Auth is a separate `PUT …/<id>/auth`: `authz_gates` absent preserves, null inherits, array declares. Other auth fields are not a generic merge patch: omitted authorizers become inheritance and omitted override booleans become false. Read before changing auth. `PATCH …/<id>/move` takes `parent_id` (null/omitted reroots); deletion uses `DELETE …/<id>` and can remove a subtree. System-managed auth nodes reject destructive edits.
+Update semantics:
+
+- `PUT …/endpoints/<id>/info` is a **partial update**: omitted keeps; explicit
+  null clears `method`, `script_name`, `workflow_name`, `overrides`,
+  `path_override` — binding constraints still apply; `segment:null` does
+  **not** clear the segment; `crud_config`/`ws_config` replace wholesale on
+  their targets, null/omitted is not a clear.
+- Permissions go through `PUT …/<id>/auth`: `authz_gates` omitted keeps, null
+  restores inheritance, an array declares; the other auth fields are **not**
+  a generic merge patch — omitting authorizers restores inheritance and
+  omitting an override boolean turns it false; read current values first.
+- `PATCH …/<id>/move` takes `parent_id` (null/omitted moves to root);
+  `DELETE …/<id>` can delete a **subtree**; platform-managed built-in auth
+  nodes refuse destructive changes.
 
 ## Argument binding and coercion
 
-The runtime receives one flat argument object, not an HTTP request object. Unconfigured path/query values are strings; JSON body fields retain JSON types. Empty body is accepted; a nonempty ordinary body must be a JSON **object**, not an array, scalar or malformed JSON. Header presence is checked first. Binding order is path → query (cannot overwrite a path argument) → body (**can overwrite path/query**). Precedence uses the final argument name after `as` renaming. Declared fields win over undeclared fields colliding with their alias within a section. Do not treat a path value as unchangeable business identity if body passthrough can shadow it.
+The runtime receives a **flat parameter object**, not an HTTP request object:
 
-`overrides.path_params`, `query_params`, `body_fields` are wire-name → declaration maps. Each declaration has required `type` (`int|float|bool|string|json`), `required:false`, optional `default`, optional `as` argument name, optional `nullable`. Missing optional fields with no default stay absent; a script default may then apply. Defaults fill missing argument names after each section, so an argument already supplied in an earlier section satisfies that presence check. `required` is not an independent requirement to send the field in that exact section. Explicit null is not a missing/defaulted field. `nullable:true` passes body null through; false/absent ordinarily refuses null for scalar types; `json` accepts any JSON value including null. Setting `nullable:false` also acknowledges the deliberate mismatch with a nullable script input for publish lint. Path/query have no nullable spelling.
+- Undeclared path/query values are strings; JSON bodies keep JSON types.
+- An empty body is legal; a non-empty ordinary body must be a JSON **object**
+  (arrays, scalars and broken JSON are rejected).
+- Merge order: required headers checked first → path → query (which
+  **cannot** override path parameters) → body (which **can** override
+  path/query); precedence follows the post-`as` parameter name; within one
+  part, declared fields beat conflicting undeclared aliases.
 
-String conversion: `int` parses signed 64-bit decimal; `float` parses a finite number; `bool` accepts case-insensitive `true/1/yes` or `false/0/no`; `string` stays literal; path/query `json` parses JSON text. Body string values are converted for numeric/bool declarations, while body `json` leaves a string as a string. Body numbers pass numeric coercion, then effective JSON Schema may impose a stricter integer constraint. Invalid/missing/unknown input returns `400 bad_request` before execution. `strict:false` passes undeclared query/body keys; `true` rejects them and requires every path parameter to be declared at configuration time. Effective frozen input-schema validation applies when an overrides object is present; absent overrides retain loose legacy dispatch.
+> [!WARNING]
+> When body pass-through is allowed, never treat a path value as an
+> inviolable business identity — the body has higher precedence.
 
-## Complete overrides surface
+Declaration shape: `overrides.path_params`, `query_params`, `body_fields`
+each map wire names to declarations. Every entry requires `type`
+(`int|float|bool|string|json`); `required` defaults to false; optional
+`default`, alias `as`, `nullable`.
 
-| Field | Default / constraints |
+- An optional without a default stays "absent" so the script's own default
+  applies; defaults fill in by final parameter name after each part
+  processes, so a same-named parameter from an earlier part already satisfies
+  the existence check; `required` does not mean "must arrive from that
+  specific part".
+- Explicit null is not absence and never auto-replaces with a default. Body
+  `nullable:true` admits null; false/omitted usually rejects scalar null;
+  `json` accepts any JSON including null. `nullable:false` additionally
+  states "deliberately different from a nullable script input" and affects
+  publish lint. Path/query have no null representation.
+
+String conversion: `int` parses signed 64-bit decimal; `float` parses finite
+numbers; `bool` accepts case-insensitive `true/1/yes`/`false/0/no`; `string`
+passes through; path/query `json` parses JSON text. Body strings coerce per
+number/bool declarations; body `json` keeps strings; body numbers pass
+through numeric conversion after which a valid JSON Schema may impose
+stricter integer limits. Invalid, missing or unknown parameters return
+`400 bad_request` before execution. `strict:false` passes undeclared
+query/body through; `true` rejects them and requires every path parameter
+declared at configuration time. Frozen effective-input-schema validation
+activates only when an overrides object exists; omitting the layer entirely
+keeps the older lenient dispatch.
+
+## Full overrides fields
+
+| Field | Default and constraints |
 | --- | --- |
-| `path_params`, `query_params`, `body_fields` | Empty maps; field declarations above. |
-| `required_headers` | Empty list; presence check is case-insensitive, not a value/schema check. Does not itself expose headers to scripts. |
-| `response_headers` | Empty map of response header values. |
-| `response_transform` | Absent/null is identity; RFC 9535 JSONPath transforms JSON output before final response handling. |
-| `rate_limit` | Absent is unlimited. Optional `endpoint` and `subject` quotas each require positive `requests`, `window_secs`; optional positive `burst` defaults to requests. Both buckets must admit. `subject_key:identity` defaults to caller identity, anonymous falls back to IP; `ip` always uses IP. Limits are instance-local unless the deployment uses its shared backend; rejection is 429 with `Retry-After`. |
-| `audit_reason` | Default `header.X-Viat-Reason`; also `body.<field>` or `none`. Required reasons are determined by the audited resource/table. |
-| `raw_body` | `false`; exact body bytes appear as `ctx.request.body` text or `body_base64` for non-UTF-8, not arguments. Excludes `body_fields`, multipart and cache. Use for webhook signatures; expose required signature headers in project settings. |
-| `multipart` | Absent is off. `{max_file_bytes:0,max_files:0,fields:[]}`: zero bytes uses deployment maximum, zero files means one, empty fields accepts all text fields. File parts spool to `ctx.request.files`; unlisted text fields are dropped. Per-file limit cannot exceed deployment storage ceiling. Excludes raw body, async and CRUD. |
-| `run_async` | `false`; always return an async handle when true. Not supported for proxy/native-auth/CRUD/WS targets. |
-| `cache` | Absent is off; GET script/workflow/CRUD only; `{ttl_secs,scope:"caller",vary_headers:[],ignore_params:[]}`. CRUD cannot use shared scope. Excludes raw body, multipart, async and current-user grants. |
-| `project_users_grant` | Optional `{roles:[]}`; published script capability limited to listed non-admin roles, never project administrators. Not a role grant for the caller. |
-| `current_user_grant` | Optional `{read_social_identity:false,provision_meta_keys:[]}`; uncached synchronous script endpoint only. No grant in direct/test/library/queued executions. Host validates the current native-social/external-JWT identity; cannot name another user. |
-| `strict` | `false`; closed argument contract when true. |
+| `path_params`, `query_params`, `body_fields` | Default empty maps; declarations above. |
+| `required_headers` | Default empty; case-insensitive **presence** check only — no value validation, no automatic script exposure. |
+| `response_headers` | Default empty response-header map. |
+| `response_transform` | Omitted/null: no transform; RFC 9535 JSONPath transforms JSON output before final response processing. |
+| `rate_limit` | Omitted: unlimited. The optional `endpoint` and `subject` quotas each need positive `requests`/`window_secs` and optional positive `burst` (default = requests); **both buckets must pass**. `subject_key:identity` defaults to identity (anonymous degrades to IP); `ip` is always by IP. Without a shared backend, counting is instance-local; rejection is 429 with `Retry-After`. |
+| `audit_reason` | Default `header.X-Viat-Reason`; also `body.<field>`, `none`. Whether a reason is mandatory is decided by the audit resource/table. |
+| `raw_body` | Default false; exact bytes land in `ctx.request.body` (UTF-8) or `body_base64`, never in parameters; mutually exclusive with `body_fields`, multipart, cache. Webhook-verification headers additionally need project-settings exposure. |
+| `multipart` | Omitted: off. `{max_file_bytes:0,max_files:0,fields:[]}`: 0 bytes uses the deployment cap, 0 files means one, empty fields accepts all text fields; files stream to disk as `ctx.request.files` handles; unlisted text fields are dropped. Per-file caps cannot exceed deployment storage limits. Exclusive with raw body, async, CRUD. |
+| `run_async` | Default false; true always returns an async handle. Proxy, built-in auth, CRUD and WS do not support this mode. |
+| `cache` | Omitted: off; GET script/workflow/CRUD only; `{ttl_secs,scope:"caller",vary_headers:[],ignore_params:[]}`; CRUD has no shared; exclusive with raw body, multipart, async, current-user grant. |
+| `project_users_grant` | Optional `{roles:[]}`; the published script gains capabilities over users holding the listed **non-admin** roles only, never project admins; it does not grant the caller any role. |
+| `current_user_grant` | Optional `{read_social_identity:false,provision_meta_keys:[]}`; uncached synchronous script endpoints only. Direct, test, library and queued executions lack this capability; the host verifies the current native-social/external-JWT identity and cannot name another user. |
+| `strict` | Default false; true closes undeclared parameter ingress. |
 
-## Responses, streaming and request lifetime
+## Responses, streams and the request lifecycle
 
-An ordinary return value is JSON. An explicit `ViatResponse` controls status, headers, content type and body (including managed-file responses); a script error uses the platform error shape `{"error":"code","message":"detail"}`. Endpoint response headers/transforms apply at dispatch, not to a direct script test. An explicit-response **draft script test** can report `output:null`: that is not proof the HTTP response body is null. Saved cases compare the explicit response's body separately.
+- Plain return values emit JSON directly; an explicit `ViatResponse` controls
+  status/headers/content type/body and may return managed files; script
+  errors use the platform shape `{"error":"code","message":"detail"}`.
+- Endpoint response headers/transforms execute at dispatch and **do not
+  apply** to direct script tests; a draft test of an explicit response can
+  show `output:null` while the real HTTP body is not null; saved cases
+  compare the explicit response body separately.
+- Streaming scripts emit chunked streams (Python/TypeScript generators in
+  the script reference); **once the HTTP status is sent, later stream errors
+  cannot change it**; proxied streams and files are not replayable buffered
+  JSON.
+- Client disconnect/timeout never rolls back committed resource writes: use
+  business transactions and durable work records; never retry a mutating
+  request merely because the response was lost.
+- Ordinary buffered requests cap at **2 MiB** before running; multipart uses
+  separate streaming/spill limits; proxied streaming bypasses this JSON cap.
+  Run timeouts resolve from script/workflow budgets and deployment ceilings —
+  there is no request-level "infinite timeout"; a proxy or load balancer can
+  time out before a still-running script does.
 
-Streaming scripts return chunked streaming output; Python/TypeScript generator paths and language-specific APIs are described in the scripting references. A response cannot change its already-sent HTTP status after the stream starts. Proxy streaming and file responses are not replayable buffered JSON. Client disconnect/timeout does not undo already committed resource writes. Use business transactions and durable work records; never retry a mutating request solely because its response was lost.
+## Async, idempotency and caching
 
-Ordinary buffered requests are capped at **2 MiB** before runtime. Multipart has its own streaming/spooling ceilings; proxy mounts forward streaming bodies rather than applying this JSON limit. Runtime timeout is the resolved script/workflow budget under deployment ceilings, not a configurable per-request unlimited timeout. A proxy/load-balancer timeout can be shorter than a still-running script.
+**Async**: `X-Viat-Async:true` or `run_async:true` starts an async
+script/workflow. `X-Viat-Delay` (seconds) or `X-Viat-Run-At` delays queuing
+(mutually exclusive, up to 30 days out); `X-Viat-Tz` interprets local times.
+The 202 answer carries `run_id`, `run_token`, `poll_path`; poll
+`GET <poll_path>` with `X-Viat-Run-Token:<run_token>` — that token is a
+single-run read capability, never log it. Async result storage cannot fully
+express all streams, files and explicit HTTP responses and is not guaranteed
+identical to synchronous rendering. Console cancellation:
+`POST /projects/<slug>/async-runs/<id>/cancel`; best-effort cancellation may
+answer `not_cancellable`/`already_finished`/`owner_unreachable` and never
+undoes existing side effects. Multipart rejects async/delay and idempotency
+headers; built-in auth/CRUD never go to the background; requesting delay on
+an unsupported target is rejected.
 
-## Async, idempotency and cache
+**Idempotency**: authenticated synchronous `POST|PUT|PATCH|DELETE` may send
+an `Idempotency-Key` of at most 255 bytes, isolated by project, method,
+exact path and caller. The fingerprint covers query/body; the same key with
+a different request conflicts; concurrent in-flight requests conflict rather
+than re-execute; completed replays carry a replay marker. Anonymous eligible
+keyed requests are rejected; GET, tests and proxies are outside this
+guarantee. Successful and client-error buffered responses can be stored;
+server errors, streams/files and responses over **256 KiB** are not.
 
-`X-Viat-Async:true` or `run_async:true` requests an async script/workflow run. `X-Viat-Delay` seconds or `X-Viat-Run-At` time queues delayed work (mutually exclusive, up to 30 days; `X-Viat-Tz` interprets local times). A 202 response carries `run_id`, `run_token`, `poll_path` (and queued timing metadata where applicable). Poll `GET <poll_path>` with `X-Viat-Run-Token:<run_token>`. Treat the token as a single-run read capability. Keep it out of logs. Async result storage cannot represent every streaming/file/explicit response shape; do not promise identical synchronous HTTP rendering. Console cancellation is `POST /projects/<slug>/async-runs/<id>/cancel`; cancellation is best effort, can report `not_cancellable`, `already_finished`, or `owner_unreachable`, and cannot roll back completed side effects. Multipart requests reject async/delay and idempotency headers. Native-auth/CRUD requests do not become background runs; delayed requests to unsupported targets are refused.
+> [!WARNING]
+> Idempotency is best-effort retry protection, not business exactly-once:
+> DB claim/save failures and stale-claim reclamation can re-execute.
+> Irreversible actions still need business unique keys.
 
-For authenticated synchronous `POST|PUT|PATCH|DELETE`, `Idempotency-Key` (max 255 bytes) scopes replay to project, method, concrete path and caller. The fingerprint covers query/body; reusing a key for a different request conflicts. A concurrent in-flight request returns conflict rather than executing again; completed replay includes the replay marker. Anonymous callers are refused for eligible keyed requests. GET/test/proxy paths are not this contract. Success and client-error buffered responses may be retained; server errors, streaming/file responses and bodies over **256 KiB** are not retained. This is best-effort retry protection, not exactly-once business execution: DB claim/storage failure and stale claim reclamation can permit another run. Use a business uniqueness key for irreversible effects.
+**Caching**: a GET cache key includes the publish snapshot/generation, bound
+parameters (minus `ignore_params`), configured vary headers, and by default
+the caller's identity/roles/claims. `shared` explicitly asserts the result is
+caller-independent; a hit still runs authentication, authorization, rate
+limiting and parameter binding. Only applicable successful buffered
+responses are stored; inspect `X-Viat-Cache`. External DB writes do not
+invalidate caches — call `POST …/endpoints/<id>/cache/purge` or
+`ctx.cache.purge("GET /path")`; publishing/rolling back makes old answers
+unreachable. User-management or caller-sensitive outputs must not configure
+shared.
 
-GET response cache keys include published snapshot/generation, bound arguments (except `ignore_params`), configured varied headers and, by default, caller identity/role/claims. `shared` explicitly asserts caller-independent output. Authentication, authorization, rate checks and binding still run on hits. Only eligible buffered successful responses are stored; inspect `X-Viat-Cache`. External database writes do not automatically invalidate answers: purge with `POST …/endpoints/<id>/cache/purge` or `ctx.cache.purge("GET /path")`. Publish/rollback makes old answers unreachable. Do not cache user administration or caller-sensitive output as shared.
+## Proxy and cleanup
 
-## Proxy mounts and cleanup
+A proxy binds an `http_api` resource and sets no method: it forwards **all**
+methods under the prefix and strips the mount prefix by default. Published
+authorizers/gates/rate limits/logs still apply, but script parameter binding,
+background queues, response caching and platform idempotent replay are not
+inserted. Resource credentials apply platform-side; inbound platform
+authorization, cookies and hop-by-hop headers are filtered; optional identity
+assertion is configured on the upstream resource. Resource settings stay
+live — editing them immediately affects published mounts. Responses stream
+through; **this HTTP proxy is not a WebSocket upgrade tunnel**. Transport
+timeouts/outbound policy come from the HTTP resource and deployment, not
+from script timeout annotations; callers must never choose arbitrary
+upstream addresses.
 
-A proxy binds an `http_api` resource and no method, forwarding every method under its prefix. Strip-prefix defaults true. Normal published authorizers/gates/rate limits/logging still apply, but no script argument binding, async queue, response cache or platform idempotent replay is inserted. Resource credentials are applied server-side; incoming platform authorization, cookies and hop-by-hop headers are filtered. Optional identity assertion is configured on the upstream resource. Upstream resource settings remain live: editing them can affect an existing published mount without republishing. Upstream response bodies stream; upgrade to WebSocket is not this proxy's supported tunnel. Its transport timeout and outbound network policy come from the HTTP resource/platform, not a script timeout annotation. Never expose an arbitrary caller-selected destination.
+Wrap-up: in an isolated fixture verify bad input, unauthorized callers,
+legitimate callers and timeout/retry, checking rejection and execution logs
+separately. To stop new calls, `POST …/<id>/unpublish` — **not** editing or
+deleting the script. Before cleaning isolated endpoints/scripts, check
+queued jobs and external side effects. Repo entry points are
+`endpoints/*.get.yaml`-style method files, `viat push`,
+`viat endpoint publish`, `viat call` — see [CLI](../cli/endpoint.md) and
+[endpoint tests](../testing/endpoint-tests.md).
 
-Verify malformed input, forbidden callers, allowed callers and timeout/retry behavior in an isolated endpoint fixture. Inspect refusal **and** runtime logs. To stop new calls unpublish the leaf (`POST …/<id>/unpublish`); editing/deleting a script is not a safe substitute. Delete the isolated endpoint/script only after pending async work and external effects are accounted for. Repo entry points are `endpoints/*.get.yaml` (and other methods), `viat push`, `viat endpoint publish`, `viat call`; see the [CLI](../cli/endpoint.md) and [endpoint tests](../testing/endpoint-tests.md).
+## Verification basis
 
-## Maintenance evidence
-
-Source: `crates/viat-api/src/dto.rs`, `handlers/endpoints.rs`, `handlers/dispatch.rs`, `handlers/proxy.rs`, `handlers/async_runs.rs`, `idempotency.rs`, `endpoint_cache.rs`; `crates/viat-core/src/types/endpoint.rs`; `crates/viat-runtime/src/override_coerce.rs`. Examples were derived from these paths, not executed. Provider/proxy/load behavior requires separate opt-in verification.
+Contract source `03751a67`: `crates/viat-api/src/dto.rs`,
+`handlers/endpoints.rs`, `handlers/dispatch.rs`, `handlers/proxy.rs`,
+`handlers/async_runs.rs`, `idempotency.rs`, `endpoint_cache.rs`;
+`crates/viat-core/src/types/endpoint.rs`;
+`crates/viat-runtime/src/override_coerce.rs`. Examples are source-derived
+and unexecuted; providers, proxies and load-balancer behavior need separate
+authorized verification.

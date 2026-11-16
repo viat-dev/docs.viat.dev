@@ -106,6 +106,6 @@ Viewer 收到 403 而非空列表。已启用不证明 broker 可达或消息处
 
 验证应以观察为主：检查本文结果字段，获准修改前后使用对应读取工具。不要通过生产请求或删除无关对象来验证。
 
-## 维护依据
+## 核验依据
 
 输入清单：`contracts/1.1.0/mcp-tools.json`，工具 `list_queue_triggers`. 固定产品源码中的实现和测试： `queue.rs; handlers/queue_triggers.rs; tests/it/tool_list_queue_triggers.rs`. 工具模块文件名相对 `crates/viat-mcp/src/tools/`，API handler 相对 `crates/viat-api/src/handlers/`。公共传输和错误依据为 `crates/viat-mcp/src/tools/service.rs`、`http.rs`、`error.rs`；本次仅阅读测试，没有运行测试。

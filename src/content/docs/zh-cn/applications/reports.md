@@ -190,4 +190,8 @@ unset CASE_API_KEY
 
 ## 依据与未验证边界
 
-参见 [SMTP](../assets/resources/smtp.md)、[SQLite](../assets/resources/sqlite.md)、[工作流](../assets/workflows/overview.md)、[上下文](../assets/scripts/context.md)、[HTTP](../triggers/http.md)、[调度](../triggers/schedules.md)、[repo-sync](../projects/repo-sync.md)。定点源码：`crates/viat-runtime/src/python.rs` 的 SQL transaction/execute/mail，`crates/viat-api/src/runner/broker.rs` 的 SQLite 事务和 repo-sync 序列化。实际中继连通/TLS/供应商接受、真实 broker 故障、cron 时机与发布 HTTP 需单独授权集成验证；单元测试不能证明邮件投递。
+参见 [SMTP](../assets/resources/smtp.md)、[SQLite](../assets/resources/sqlite.md)、[工作流](../assets/workflows/overview.md)、[上下文](../assets/scripts/context.md)、[HTTP](../triggers/http.md)、[调度](../triggers/schedules.md)、[repo-sync](../projects/repo-sync.md)。实际中继连通/TLS/供应商接受、真实 broker 故障、cron 时机与发布 HTTP 需单独授权集成验证；单元测试不能证明邮件投递。
+
+## 核验依据
+
+定点源码：`crates/viat-runtime/src/python.rs` 的 SQL transaction/execute/mail，`crates/viat-api/src/runner/broker.rs` 的 SQLite 事务和 repo-sync 序列化。

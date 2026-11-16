@@ -73,7 +73,7 @@ viat license show --json
 
 **Failure handling, verification and cleanup.** A 403 license_required on other commands is not solved by project role changes. Obtain a valid code through your authorized supplier; no mutation/cleanup.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

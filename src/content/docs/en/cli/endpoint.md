@@ -391,7 +391,7 @@ viat endpoint update-info 00000000-0000-4000-8000-000000000001 --segment demo-re
 
 **Failure handling, verification and cleanup.** Clear flags are NOT parser conflicts: when a value and its clear flag are both supplied, clear wins. Invalid resulting branch/leaf states can still fail server validation. Save show output, verify the resulting node, publish intentionally; restore previous fields and publish to undo served changes.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

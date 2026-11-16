@@ -8,54 +8,56 @@ channel: stable
 
 # Network, TLS and deployment inputs
 
-This page includes application network settings and non-application installer inputs. [Table conventions](overview.md) apply; all are optional except stated conditional requirements. Deployment/proxy examples are unexecuted.
+Application network settings and non-application installer inputs.
+[Table conventions](overview.md) apply; everything is optional unless a
+condition says otherwise. Deployment/proxy examples are unexecuted.
 
 ## Server and WebSocket settings
 
 | Variable | Type; default | Validation, scope and precedence |
 | --- | --- | --- |
-| `VIAT_BIND` | string; `0.0.0.0:8080` | S. Listener address. TLS path requires parseable IP:port SocketAddr; choose loopback/private interface behind a proxy. Docker/wrapper may explicitly set it. |
-| `VIAT_PUBLIC_URL` | URL; unset / 未设置 | S + D. Trimmed/trailing slash removed; path becomes mount prefix. Unset derives origin from Host/X-Forwarded-Proto. No strict universal URL validation; provide an absolute trusted URL. No project override. |
-| `VIAT_TRUST_PROXY_HEADERS` | boolean; `false` | F. Trim/case-fold true/yes or 1 enables forwarded client IP. Only safe when all traffic passes trusted header-sanitizing proxies. |
-| `VIAT_TLS_CERT` | path; unset / 未设置 | S. PEM certificate/full chain; must pair with key. Empty is unset. File contents reloaded on mtime changes every 60s; changing path requires restart. |
-| `VIAT_TLS_KEY` | path; unset / 未设置 | S. PEM private key matching cert; one-sided config or initial load failure aborts startup. Failed later reload keeps previous certificate. |
-| `VIAT_WEB_DIR` | path; unset / 未设置 | S. Readable built console directory containing index.html. Docker /app/web. Invalid directory serves no console with warning, not arbitrary server filesystem. |
-| `VIAT_UI_ENABLED` | boolean; `true` | S. Trimmed case-insensitive false/no or 0 disables console even when image supplies directory; API remains. No UI if directory absent regardless. |
-| `VIAT_DOCS_DIR` | path; unset / 未设置 | S. Rendered book directory containing readable index.html. Docker /app/docs. Used for /_docs, not a remote docs URL. |
-| `VIAT_DOCS_ENABLED` | boolean; `true` | S. Same parser as UI_ENABLED. Disable embedded /_docs independently from console. |
-| `VIAT_WS_MAX_CONNECTIONS` | u64 → usize; `10000` connections | F. Positive per-instance WebSocket connection cap; 0/invalid → default. Not a fleet-wide cap. |
-| `VIAT_WS_MAX_MESSAGE_BYTES` | u64 → usize; `65536` bytes | F. Positive inbound WebSocket message ceiling (64 KiB). |
-| `VIAT_WS_QUEUE_DEPTH` | u64 → usize; `32` messages | F. Positive outbound per-connection queue; slow consumers may be closed instead of growing unbounded memory. |
-| `VIAT_WS_REVALIDATE_SECS` | u64; `300` s | F. Positive session/authorization recheck interval, not a guarantee of instant credential revocation. |
-| `VIAT_WS_MAX_LIFETIME_SECS` | u64; `86400` s | F. Positive connection lifetime ceiling (24h); clients must reconnect/re-authenticate. |
+| `VIAT_BIND` | string; `0.0.0.0:8080` | S. Listen address; built-in TLS requires a resolvable IP:port. Behind a proxy, pick a loopback/private address. Docker/deploy scripts may set it explicitly. |
+| `VIAT_PUBLIC_URL` | URL; unset | S + D. Trimmed of whitespace and trailing slash; the **path is the mount prefix**. Unset derives from Host/X-Forwarded-Proto. No unified strict validation — provide a trusted absolute URL. No project override. |
+| `VIAT_TRUST_PROXY_HEADERS` | boolean; `false` | F. Trimmed case-insensitive `true`/`yes`/`1` enables forwarded client IPs; safe **only when every request passes a trusted proxy that sanitizes headers**. |
+| `VIAT_TLS_CERT` | path; unset | S. PEM certificate/full chain, requires the key; empty counts as unset. Mtime is checked every 60 seconds and the file reloaded; **changing the path needs a restart**. |
+| `VIAT_TLS_KEY` | path; unset | S. Matching PEM private key; setting only one side, or a first-load failure, blocks startup; later reload failures **keep the old certificate**. |
+| `VIAT_WEB_DIR` | path; unset | S. Console build directory with a readable index.html (Docker: /app/web). An invalid directory warns and serves no console. |
+| `VIAT_UI_ENABLED` | boolean; `true` | S. Trimmed `false`/`no` (case-insensitive) or `0` disables the console; **APIs stay on**. Enabled without a directory still serves no UI. |
+| `VIAT_DOCS_DIR` | path; unset | S. Rendered handbook directory with a readable index.html (Docker: /app/docs); serves `/_docs`, not a remote docs URL. |
+| `VIAT_DOCS_ENABLED` | boolean; `true` | S. Same parsing as UI_ENABLED; independently disables built-in `/_docs`. |
+| `VIAT_WS_MAX_CONNECTIONS` | u64 → usize; `10000` connections | F. Positive per-instance WebSocket cap; 0/invalid falls back. **Not** a cluster cap. |
+| `VIAT_WS_MAX_MESSAGE_BYTES` | u64 → usize; `65536` bytes | F. Positive inbound message cap (64 KiB). |
+| `VIAT_WS_QUEUE_DEPTH` | u64 → usize; `32` messages | F. Positive per-connection outbound queue depth; slow consumers can be closed to bound memory. |
+| `VIAT_WS_REVALIDATE_SECS` | u64; `300` s | F. Positive session/authorization recheck interval — no guarantee of instant credential revocation. |
+| `VIAT_WS_MAX_LIFETIME_SECS` | u64; `86400` s | F. Positive connection lifetime cap (24 hours); clients must reconnect and re-authenticate. |
 
-## Compose and deployment-wrapper controls
+## Compose and deployment-script controls
 
 | Variable | Type; default | Validation, scope and precedence |
 | --- | --- | --- |
-| `VIAT_TAG` | string; `latest` | I, Compose only. Selects image tag; pin 1.1.0 or an approved digest instead of mutable latest. |
-| `VIAT_PORT` | port mapping; `8080` | I, Compose only. Host-side published port; container remains 8080. Docker validates mapping. |
-| `POSTGRES_USER` | string; `viat` | I, example PostgreSQL image init and generated DATABASE_URL. Changing an existing volume does not rename/create its roles. |
-| `POSTGRES_PASSWORD` | string; `viat` | I, example PostgreSQL image init and URI interpolation. Replace unsafe example default. Changing it does not rotate an existing database role password. |
-| `POSTGRES_DB` | string; `viat` | I, example PostgreSQL initialization and URI. Existing volume is not reinitialized. |
-| `ENV_FILE` | path; `scripts/.env` | I, deployment wrapper. Select before sourcing; file required, executable shell syntax. Wrapper only forwards keys declared in this file, excluding script-only keys. |
-| `IMAGE` | image reference; official `:latest` | I, wrapper. Nonempty caller environment > file > default. Pin stable artifact; no automatic schema compatibility guarantee. |
-| `IMAGE_TAR` | path; unset / 未设置 | I, wrapper. Nonempty imports local docker archive and skips registry login/pull; IMAGE must match loaded image. Caller > file. |
-| `NAME` | string; `viat-server` | I, wrapper. Docker container name; existing named container is forcibly removed/recreated. Caller > file. |
-| `HOST_PORT` | port mapping; `8080` | I, wrapper. Host mapping to fixed internal 8080. Caller > file; consider 127.0.0.1:8080 behind proxy. |
-| `PULL` | switch; `1` | I, wrapper. Exactly 1 pulls unless IMAGE_TAR supplied; 0 uses local image. Caller > file. |
-| `UV_CACHE_VOLUME` | mount; `viat-uv-cache` | I, wrapper. Mounted at /home/viat/.cache/uv. Caller > file. Do not confuse with application UV_* package settings. |
-| `READY_TIMEOUT` | integer; `60` s | I, wrapper. Shell loop wait for HTTP /auth/config, not /readyz or script environment readiness. Use positive seconds; caller > file. |
-| `DOCKER_NETWORK` | string; unset / 未设置 | I, wrapper. Existing Docker network; caller > file. Enables database/container-name reachability. |
-| `EXTRA_MOUNT` | string; unset / 未设置 | I, wrapper. Comma-separated Docker -v specifications. Caller > file. Use read-only mounts where possible; do not mount host socket/root. |
-| `SECURITY_OPT` | string; unset / 未设置 | I, wrapper. Comma-separated Docker security-opt entries; caller > file. seccomp=unconfined weakens isolation; not a production default. |
-| `PIDS_LIMIT` | Docker limit; `512` | I, wrapper. Container processes/threads; Docker validates. Actual implementation sources file after caller, so file can override caller for this variable. Not application concurrency. |
-| `MEMORY_LIMIT` | Docker size; `4g` | I, wrapper. Container memory limit; Docker validates. File can override caller in current implementation. Example starting point, not sizing recommendation. |
-| `REGISTRY_HOST` | host[:port]; derived / 推导 | I, wrapper. Derived from IMAGE registry component unless explicit; caller > file. Never forwarded to app. |
-| `REGISTRY_USERNAME` | string; unset / 未设置 | I, wrapper. Needed with registry password when login performed; caller > file. Docker stores login credential on deployment host. |
-| `REGISTRY_PASSWORD` | string; unset / 未设置 | I, wrapper. Paired login secret, sent using password-stdin, not app env. File credential below wins. Caller > file. |
-| `REGISTRY_PASSWORD_FILE` | path; unset / 未设置 | I, wrapper. Readable password file overrides REGISTRY_PASSWORD. Restrict file access. Caller > file. |
-| `REGISTRY_LOGIN` | switch; `1` | I, wrapper. Exactly 1 allows login on pull path; 0 skips, uses Docker existing credentials/anonymous access. Caller > file. |
+| `VIAT_TAG` | string; `latest` | I, Compose only. Image tag; pin 1.1.0 or an approved digest in production — not the mutable latest. |
+| `VIAT_PORT` | port mapping; `8080` | I, Compose only. Host-published port; the container still listens on 8080. |
+| `POSTGRES_USER` | string; `viat` | I. Example-image initialization and DATABASE_URL assembly; on an existing volume, changing it **renames/creates nothing**. |
+| `POSTGRES_PASSWORD` | string; `viat` | I. Example initialization and URI substitution; replace the insecure default; changing it **never rotates** an existing database password. |
+| `POSTGRES_DB` | string; `viat` | I. Example initialization and URI; existing volumes are not reinitialized. |
+| `ENV_FILE` | path; `scripts/.env` | I, deploy script. Chosen before loading; the file must exist with executable shell syntax; only its declared non-script keys are forwarded. |
+| `IMAGE` | image ref; official `:latest` | I, deploy script. Non-empty: calling environment > file > default. Pin stable artifacts; automatic database-schema compatibility is not guaranteed. |
+| `IMAGE_TAR` | path; unset | I, deploy script. Non-empty imports a local image tar and skips login/pull; IMAGE must match the imported image; calling environment wins. |
+| `NAME` | string; `viat-server` | I, deploy script. Container name; **an existing same-named container is force-deleted and recreated**; calling environment wins. |
+| `HOST_PORT` | port mapping; `8080` | I, deploy script. Host mapping onto the fixed container port 8080; behind a proxy `127.0.0.1:8080` works; calling environment wins. |
+| `PULL` | switch; `1` | I, deploy script. Without IMAGE_TAR, strictly `1` pulls; `0` uses the local image; calling environment wins. |
+| `UV_CACHE_VOLUME` | mount; `viat-uv-cache` | I, deploy script. Mounted at /home/viat/.cache/uv; calling environment wins; **not** an application UV_* package setting. |
+| `READY_TIMEOUT` | integer; `60` s | I, deploy script. Shell loop waiting on plain `http://…/auth/config` — **not** /readyz or environment readiness; positive seconds; calling environment wins. |
+| `DOCKER_NETWORK` | string; unset | I, deploy script. An existing Docker network; calling environment wins; used for database/container-name reachability. |
+| `EXTRA_MOUNT` | string; unset | I, deploy script. Comma-separated Docker -v specs; calling environment wins; prefer read-only and **never mount host sockets or root**. |
+| `SECURITY_OPT` | string; unset | I, deploy script. Comma-separated security-opts; calling environment wins; `seccomp=unconfined` weakens isolation and is no production default. |
+| `PIDS_LIMIT` | Docker limit; `512` | I, deploy script. Container process/thread cap (Docker-validated). The implementation reads the calling environment before the file, so **the file can override the caller's value**. Not application concurrency. |
+| `MEMORY_LIMIT` | Docker size; `4g` | I, deploy script. Container memory cap (Docker-validated); the file can override the caller's value; an example starting point, not capacity advice. |
+| `REGISTRY_HOST` | host[:port]; derived | I, deploy script. Derived from IMAGE when unset; calling environment wins; never injected into the app. |
+| `REGISTRY_USERNAME` | string; unset | I, deploy script. Needed when logging in with a password; calling environment wins; Docker stores login credentials on the deploy host. |
+| `REGISTRY_PASSWORD` | string; unset | I, deploy script. Paired login secret passed via password-stdin, **never entering the app environment**; the password file below wins; calling environment wins. |
+| `REGISTRY_PASSWORD_FILE` | path; unset | I, deploy script. A readable password file overriding REGISTRY_PASSWORD; restrict its permissions; calling environment wins. |
+| `REGISTRY_LOGIN` | switch; `1` | I, deploy script. The pull path logs in only on strict `1`; `0` skips it and uses existing Docker credentials/anonymously; calling environment wins. |
 
 ## Public URL, prefixes and reverse proxies
 
@@ -64,24 +66,67 @@ VIAT_PUBLIC_URL=https://api.example.com/viat
 VIAT_TRUST_PROXY_HEADERS=true
 ```
 
-External endpoints become `https://api.example.com/viat/p/PROJECT/PATH`, and the console is `/viat/ui/`. The path in `VIAT_PUBLIC_URL` is the prefix; there is no second supported prefix variable. The proxy can preserve it for the server to strip, or strip it exactly once itself; do not double-add/remove it. Update registered IdP callbacks and external webhook URLs; avoid prefixes colliding with internal platform paths.
+Meaning: the external endpoint is
+`https://api.example.com/viat/p/PROJECT/PATH` and the console sits at
+`/viat/ui/`. Essentials:
 
-An explicit public URL fixes the origin used in outbound links and prevents a missing `X-Forwarded-Proto` turning HTTPS into an HTTP guess. It neither terminates TLS nor opens ports nor validates proxy trust. Only enable `VIAT_TRUST_PROXY_HEADERS` when every request crosses controlled, header-sanitizing proxies. IP extraction prefers the **last** `X-Forwarded-For` element, then considers `X-Real-IP`; validate multi-proxy topology rather than blindly trusting the first element.
+- The `VIAT_PUBLIC_URL` path **is** the mount prefix; there is no second
+  supported prefix variable.
+- The proxy may keep the prefix for the server to strip, or strip it once
+  itself — **never add/remove it twice**.
+- After changing the prefix, update IdP registration callbacks and external
+  webhook URLs; avoid prefixes colliding with internal platform paths.
+- An explicit public URL pins the origin used in outbound links and prevents
+  HTTPS being guessed as HTTP when a proxy omits `X-Forwarded-Proto`. It
+  **does not** replace TLS, open ports or vouch for the proxy.
+- Enabling `VIAT_TRUST_PROXY_HEADERS` requires: every request traverses a
+  controlled proxy that **overrides** client-supplied forwarding headers.
+  IP resolution prefers the **last** `X-Forwarded-For` segment, then
+  `X-Real-IP`; validate multi-hop chains as deployed — never blindly take
+  the first segment.
 
-For complete TLS/streaming/WebSocket examples, renewal and verification see [TLS and proxy operations](../operations/tls-proxy.md).
+Full TLS/streaming/WebSocket proxy examples, renewal and validation:
+[TLS and proxies](../operations/tls-proxy.md).
 
-## Fixed limits that matter
+## Fixed limits you cannot ignore
 
-- Ordinary buffered script/workflow request bodies have a **2 MiB** ceiling; there is no arbitrary body-size environment knob. Multipart text fields share this budget; file parts use spool/file limits.
-- Proxy and dedicated S3 streaming paths differ from buffered execution. Set route-specific proxy upload limits and disk budgets instead of making every path unlimited.
-- Rust artifact uploads have a **512 MiB** ceiling. Upload support does not bypass a front proxy's size limits or authorization.
-- The default 10,000 WebSocket connections/instance is not a capacity guarantee. Queues/messages consume memory; proxies must support Upgrade and avoid harmful SSE/stream buffering.
-- Image health checks run every 30 seconds with 3-second timeout, 20-second start period and 3 retries. They probe `/healthz`, not public certificate identity or `/readyz`.
+- Ordinary request bodies handed to scripts/workflows cap at **2 MiB** — not
+  a raisable environment variable. Multipart text fields share that budget;
+  file parts use disk staging and file caps.
+- Proxied/dedicated S3 streaming is a different, unbuffered path: configure
+  request size and disk budgets per-path instead of enlarging everything.
+- Rust artifact uploads cap at **512 MiB**; "uploadable" does not mean wise
+  through any front proxy — proxy limits and authorization still apply.
+- The default 10,000 WebSocket connections per instance is not a capacity
+  promise — every queue and message costs memory; proxies must support
+  Upgrade and disable unnecessary buffering for streaming/SSE.
+- Image healthcheck: probes `/healthz` every 30 seconds with a 3-second
+  timeout, 20-second start period, 3 retries; it validates no public
+  certificate identity and is **not** `/readyz`.
 
-## Actual deployment-script effects
+## The deployment script's real side effects
 
-`deploy-server.sh` expects existing PostgreSQL; it does not create it. It sources trusted `.env`, optionally logs into a registry/imports or pulls an image, then **forcibly removes the old container** and starts its replacement. It is not a zero-downtime rolling updater. Its wait checks plaintext `http://127.0.0.1:HOST_PORT/auth/config`; direct TLS, unusual bindings or mappings need separate verification instead of treating this check as authoritative.
+`deploy-server.sh`:
 
-The wrapper supplies port 8080, a cache volume and container limits, and also forwards application keys declared in its file. Avoid conflicting `VIAT_BIND` declarations in wrapper mode. Application keys only present in the caller shell but not declared in that file are not automatically forwarded. `ENV_FILE` is shell-source input: use trusted files only, never execute an unknown downloaded script.
+- **Depends on an existing PostgreSQL** and creates no database.
+- Reads a trusted `.env`, logs in/imports/pulls as needed, then
+  **force-deletes the old container** and starts a new one — it is not a
+  zero-downtime rolling updater.
+- Its check only waits for plain
+  `http://127.0.0.1:HOST_PORT/auth/config`: built-in TLS, special binds or
+  network mappings need separate verification and must not be judged
+  unavailable by it.
+- Defaults: container port 8080, cache volume and resource limits; it also
+  forwards the file's declared application variables — avoid a conflicting
+  `VIAT_BIND` in script mode. Non-script keys present only in the caller's
+  shell and undeclared in the file are **not** forwarded.
+- `ENV_FILE` is sourced as a shell script: load trusted files only and
+  **never** run downloaded unknown scripts.
 
-Image build inputs `DEBIAN_SUITE` (bookworm), `VITE_MONACO_BUNDLE` (true; false no longer supported), `RUSTUP_DIST_SERVER`/`RUSTUP_UPDATE_ROOT` (official toolchain download when absent) are **I, build-time**. The official image's `VITE_BASE=./` gives relative assets; `VITE_VIAT_API_URL` is a custom-frontend build input, not a server knob for changing an installed API origin. See [client/toolchain classification](integrations.md).
+Image-build inputs (`DEBIAN_SUITE` default bookworm, `VITE_MONACO_BUNDLE`
+default true with false no longer supported, and
+`RUSTUP_DIST_SERVER`/`RUSTUP_UPDATE_ROOT` defaulting to official toolchain
+downloads) are all **I (build time)**. `VITE_BASE=./` is the official
+image's relative asset path; `VITE_VIAT_API_URL` is a build input for
+self-built frontends — not a server switch for changing the API origin
+after deployment. See [client and toolchain classification](integrations.md).

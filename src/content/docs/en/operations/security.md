@@ -8,54 +8,116 @@ channel: stable
 
 # Production hardening and security recovery
 
-This checklist is for deployment/security administrators and project owners. **Do not execute live changes solely because they appear here.** All command/config examples in this manual are unexecuted; production credential rotation, account resets, network changes and deletion need explicit approval. See [security settings](../configuration/security.md) for exact defaults/parsers.
+This checklist is for deployment/security administrators and project owners.
+**Never execute live changes merely because they appear here**: all
+command/config examples are unexecuted, and production credential rotation,
+account resets, network changes and deletions need explicit approval. Exact
+parsing/defaults: [security settings](../configuration/security.md).
 
-## Establish the trust boundary
+## Make the trust boundary explicit
 
-Viat executes developer-supplied code. Distinct worker UID, cleared environments and resource brokers reduce exposure; they are **not** a guarantee that hostile code cannot use the network, consume resources or read every granted resource credential. Some database/cache/AMQP/S3 objects still project credentials to scripts in 1.1.0. Therefore:
+Viat executes developer code. Distinct UIDs, cleared environments and
+resource proxies **reduce** exposure but **do not guarantee** that malicious
+code cannot reach the network, exhaust resources, or read every granted
+resource's credentials — in 1.1.0 some database/cache/AMQP/S3 objects still
+project credentials into scripts. Therefore:
 
-- Give code-authoring access only to trusted authors for the resources they can access; use separate instances/accounts/networks for mutually untrusted tenants/workloads.
-- Keep resource database/service accounts least-privilege. A resource with broad production credentials expands the authority of scripts, regardless of log masking.
-- Keep container memory/PID limits, syscall confinement and host patching. Do not mount Docker socket, host root, platform key directories or unrelated backups into script-visible trees.
-- Enforce egress with network controls. `VIAT_OUTBOUND_DENY_PRIVATE` is a selected save-time host check, not complete DNS-rebinding protection or arbitrary-code firewall.
-- Treat Rust compile permission as privileged code execution on the builder: Cargo dependencies/build scripts can execute before runtime worker UID drop.
+- Grant code execution only to trusted authors, limited to resources they
+  may access; mutually distrusting tenants/workloads get **separate
+  instances, accounts and networks**.
+- Configure business accounts least-privilege — broad production credentials
+  widen what scripts can do, and log masking does not undo that.
+- Keep memory/PID limits, syscall constraints and host patching; never mount
+  the Docker socket, host root, key directories or unrelated backups into
+  script-visible trees.
+- Restrict egress with network policy. `VIAT_OUTBOUND_DENY_PRIVATE` is a
+  host check on selected save paths — **not** complete DNS-rebinding
+  protection and not a firewall for arbitrary code.
+- Rust compilation is **privileged code execution on the builder**:
+  dependencies/build scripts run before the worker drops privileges.
 
-## Before exposure to users
+## Before opening to users
 
-1. Pin an approved 1.1.0 image/digest and record server/client versions separately. Use a supported host/container runtime and maintain security updates; old bullseye images are a transition path, not an evergreen security recommendation.
-2. Set independent strong master/JWT values, keep the original master key in separate recovery custody, and verify no built-in development JWT warning appears at startup. The binary does not fail closed on the known JWT default.
-3. Keep public registration disabled unless deliberately required; confirm a working Owner before removing bootstrap credentials. Bootstrap password changes do not reset existing accounts.
-4. Restrict management ingress, serve HTTPS, set a trusted `VIAT_PUBLIC_URL`, and only trust forwarded IP headers behind controlled proxies. An API-only node can disable console/docs, but the API still needs authentication/network policy.
-5. Check worker identity startup logs: Docker parent is root to launch uid/gid 10001 children. Missing account, malformed explicit UID or disabled drop may keep workers at server identity. Running the parent unprivileged does not somehow preserve a distinct child UID.
-6. Limit file/watch/SQLite roots and mount only approved directories. `VIAT_WORKER_DATA_DIRS` changes ownership recursively; never point it at broad host trees or the platform spool.
-7. Enable suitable MFA policy after enrollment/recovery preparation, use least-privilege PAT scopes, and review actual **operator/developer/admin/owner** project assignments. Platform roles and project membership differ.
-8. Protect `/metrics` with a random token and monitoring-only network access; protect remote log/trace stores and payloads as sensitive data. Do not disable TLS verification to get private-CA integrations working.
-9. Back up platform data, master key, external secrets/business stores/file bytes consistently and validate an [isolated restore](backup-restore.md).
+1. Pin the approved 1.1.0 image/digest and record server and client
+   versions; use supported hosts/container runtimes with patching — the old
+   bullseye image is transitional, not long-term security advice.
+2. Set independent strong master key and JWT; store the original master key
+   separately and rehearse retrieval; confirm no development-JWT warning at
+   startup — **the binary will not refuse to boot on dangerous defaults**.
+3. Disable public registration unless explicitly needed; confirm a working
+   Owner before removing bootstrap credentials; editing the bootstrap
+   password **resets no** existing account.
+4. Restrict management entry points: HTTPS plus a trusted
+   `VIAT_PUBLIC_URL`; trust forwarded headers only behind a controlled
+   proxy. API-only deployments may disable the console/docs, but APIs still
+   need authentication/network policy.
+5. Check worker-identity logs: under Docker the root parent spawns 10001/
+   10001 children; a missing account, invalid UID or disabled dropping puts
+   workers in the **same identity** as the server — an unprivileged parent
+   does not magically preserve distinct child UIDs.
+6. Constrain file/watch/SQLite roots and mount only approved directories;
+   `VIAT_WORKER_DATA_DIRS` changes ownership recursively — never point it at
+   broad host directories or the platform spool.
+7. Prepare enrollment and recovery before mandating MFA; use minimal PAT
+   scopes; audit actual **operator/developer/admin/owner** project roles —
+   platform roles and project membership differ.
+8. Metrics behind a random token on a dedicated network; external
+   logs/traces/payloads are sensitive data; a private-CA problem is
+   **never** solved by disabling TLS verification.
+9. Back up the platform database, master key, external secrets/business
+   databases/files consistently and rehearse
+   [isolated recovery](backup-restore.md).
 
-## Credential and certificate change plan
+## Credential and certificate changes
 
-| Item | Supported operational approach | Hazard |
+| Object | Operational procedure | Risks |
 | --- | --- | --- |
-| Platform JWT secret | Approved coordinated restart of all nodes, then reauthenticate/reissue affected credentials | Invalidates signed tokens; inconsistent nodes cause intermittent failures |
-| Master key | Preserve existing key; any re-encryption/migration needs a separately designed, verified procedure | Replacing env value alone strands AES ciphertext; not an automatic rotation feature |
-| Resource credential | Update using authorized resource API/console, validate controlled target, coordinate published/live behavior | Some objects are readable in scripts; old credentials need explicit provider revocation |
-| Vault token/AWS identity | Rotate scoped provider identity, keep historical-reference read access; restart static-config clients as required | Vault token is not renewed by Viat; changing backend selector does not migrate blobs |
-| TLS certificate | Atomically replace matched PEM pair; direct TLS polls mtimes every 60s | Bad reload keeps previous cert; monitor expiry/served fingerprint externally |
-| CLI/MCP session/PAT | Revoke server-side session/token using actual auth controls, remove local copy under policy | Deleting `.viat/config.yaml` alone is not proof every server credential was revoked |
+| Platform JWT | With approval, **restart all nodes together**, then have affected parties re-login/re-issue | Issued tokens invalidate; inconsistent nodes fail intermittently |
+| Master key | Keep the original; re-encryption/migration needs a separately designed and verified procedure | Replacing only the environment value renders AES ciphertext unusable; **no automatic rotation** exists |
+| Resource credentials | Change via authorized console/API; verify in a controlled way and reconcile live/published behavior | Some script objects can read credentials; old credentials still need provider-side revocation |
+| Vault/AWS identity | Rotate the scoped identity; keep read access for historical references; restart static clients as needed | Viat never renews Vault tokens; switching backends migrates no blobs |
+| TLS certificates | Atomically replace the matching PEM pair; built-in TLS checks mtime every 60 s | Failed reloads keep the old certificate; expiry/actual fingerprint need external monitoring |
+| CLI/MCP sessions/PATs | Revoke **server-side** credentials via real auth controls; remove local copies per policy | Deleting `.viat/config.yaml` proves no server-side revocation |
 
-Do not forward secrets via broad `VIAT_RUNTIME_ENV_PASSTHROUGH` rules. The denylist protects specific core names and Cargo/SSH families, **not every possible application secret**. Package-registry tokens in default forwarded namespaces can be visible to workers. Validate custom passthrough with harmless markers, not real credentials in script output.
+> [!WARNING]
+> Never pass secrets via broad passthrough rules: the deny list protects
+> specific core names plus Cargo/SSH prefixes and **recognizes no arbitrary
+> application secrets**; tokens inside the default-forwarded package-source
+> namespaces are worker-readable too. Validate rules with harmless markers —
+> never print real secrets.
 
-## Detect and contain a suspected compromise
+## When you suspect compromise
 
-1. Record UTC interval, affected identities/projects, request/run IDs and node/image versions. Preserve privately scoped logs/audit/backend events; avoid copying live secrets into incident tickets.
-2. Fence malicious ingress/producers and isolate affected nodes under the incident plan. Cancelling a run may not cancel already-committed external work; killing every container may destroy useful volatile evidence.
-3. Revoke affected sessions/PATs/resource/provider credentials through the correct control plane. Review project permissions, published snapshots, shared modules, alert destinations and external account bindings. A restored old backup can resurrect queued work/credentials.
-4. Determine exposure using [control/business audit](audit.md), provider logs and resource permissions. Absence of a row is not proof of no activity: anonymous noise, some reads and best-effort sink failures have documented gaps.
-5. Rebuild from approved artifacts and restore known-good data into isolation. Do not blindly copy compromised caches/binaries or replay queued side effects.
-6. Prove recovery with known fixtures, correct worker identity, activation, probes and external monitoring; reopen in stages, record residual unvalidated dependencies and review root cause.
+1. Record the UTC window, identities/projects, request/run IDs, nodes and
+   images; preserve logs/audit/provider events privately — **never copy
+   secrets into tickets**.
+2. Isolate malicious entry points, producers and nodes per the incident
+   plan; cancelling rolls back no external commits, and killing all
+   containers can destroy volatile evidence.
+3. Revoke sessions/PATs/resource/provider credentials in the correct
+   control plane; review permissions, publish snapshots, shared modules,
+   alert destinations and bindings — **old backups can resurrect queues and
+   credentials**.
+4. Judge exposure with [control-plane/business audit](audit.md), provider
+   logs and resource permissions: anonymous requests, partial reads and
+   best-effort logs have known gaps — **absence of records is not absence
+   of behavior**.
+5. Rebuild from approved artifacts and restore into an isolated environment
+   — never blindly copy contaminated caches/binaries or replay side effects.
+6. Verify recovery with known fixtures: worker identity, activation, probes
+   and external monitoring; reopen in stages and record untested
+   dependencies and root causes.
 
-## Known transport and assurance limits
+## Known guarantee boundaries
 
-Business `postgresql` resource `ssl` is currently ignored; MySQL `ssl=true` means Preferred and can fall back. Enforce required transport at a validated database/proxy/network boundary and verify it, rather than treating resource save as proof. See [database configuration](../configuration/database.md).
+- Business PostgreSQL resource `ssl` is currently ignored; MySQL
+  `ssl=true` is Preferred (fallback allowed). Enforce transport at
+  **validated database/proxy/network boundaries** and verify — a saved
+  resource is not evidence; see [database](../configuration/database.md).
+- In-process alerting cannot guarantee notification when the
+  process/database/egress is down; provider acceptance does not mean the
+  recipient received anything.
+- Audit tables do not defend against DBAs and are not WORM.
+- Leases/locks/idempotency are not blanket exactly-once/HA.
 
-In-process alerts cannot guarantee notification during process/DB/egress failure; provider acceptance is not recipient delivery. Audit tables are not independent WORM storage against a DBA. Leases/advisory locks and idempotency records are not blanket exactly-once/HA guarantees. Explicitly document any compensating controls needed by your risk/compliance requirements.
+Define compensating controls per risk and compliance requirements.

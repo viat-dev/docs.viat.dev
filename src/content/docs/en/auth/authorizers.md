@@ -9,15 +9,34 @@ contract_ids: []
 
 # Authorizer reference
 
-An authorizer belongs to one project and records **how** a caller was admitted. It is not a business role, a resource credential or a platform SSO provider. You need project editor membership (`owner`, `admin`, `developer`) even for authorizer list/detail reads. Configure endpoint admission separately and publish; see [endpoint authentication](endpoints.md).
+An authorizer belongs to one project and records **how** a caller was
+admitted. It is not a business role, not a resource credential and not a
+platform SSO provider. Everything — **list/detail reads included** —
+requires project editor membership (`owner`/`admin`/`developer`). Endpoint
+admission is configured separately and published; see
+[endpoint authentication](endpoints.md).
 
-## Management envelope and update semantics
+## Management requests and update semantics
 
-`GET/POST /projects/{slug}/authorizers`; `GET/PUT/DELETE .../authorizers/{name}`. Creation requires `name` (1–64 bytes as checked by the handler), `kind`; optional `config` defaults JSON null, optional/null `default_role` names an existing role, optional/null `secret` carries kind-specific secrets. Use an object config for kinds with settings; omitted config does not bypass required-kind validation.
+`GET/POST /projects/{slug}/authorizers`;
+`GET/PUT/DELETE .../authorizers/{name}`.
 
-Response fields are `id`, `project_id`, `name`, `kind`, `config`, `default_role_id`, `created_at`, `updated_at`. Secrets/ciphertext are not returned. Update cannot rename or change kind: omitted/null `config` keeps it, a supplied config replaces the entire object; omitted/null `default_role` keeps it, `""` clears, a nonempty name resolves an existing role. Omitted/null secret keeps stored secrets except the delegated-social transition described below. Rotate in place instead of delete/recreate: deleting an authorizer cascades its API-key relationship and is not a harmless rename.
+- Creation requires `name` (1–64 bytes) and `kind`; optional `config`
+  (default JSON null), optional/null `default_role` (an existing role) and
+  optional/null `secret` (kind-specific). Types with required config should
+  receive an object — omitting config **does not** bypass validation.
+- Response fields: `id`, `project_id`, `name`, `kind`, `config`,
+  `default_role_id`, `created_at`, `updated_at` — **never the
+  secret/ciphertext**.
+- Updates can neither rename nor change kind: omitted/null `config` keeps
+  and an object **replaces wholesale**; omitted/null `default_role` keeps,
+  `""` clears, a non-empty name resolves an existing role; omitted/null
+  secret keeps the existing one (the delegated-social transition is the
+  exception, below).
+- **Rotate in place; never delete-recreate**: deleting an authorizer
+  cascades its API-key relationships — it is not a harmless rename.
 
-Source-derived **unexecuted** creation example:
+Source-derived, unexecuted creation example:
 
 ```sh
 curl -sS "$BASE/projects/demo/authorizers" \
@@ -25,88 +44,168 @@ curl -sS "$BASE/projects/demo/authorizers" \
   -d '{"name":"machine","kind":"api_key","config":{"token_ttl_hours":1},"default_role":"public"}'
 ```
 
-| `kind` | Credential/entry | Configuration and boundary |
+| `kind` | Credential/entry | Config and boundaries |
 | --- | --- | --- |
-| `password` | Native identity/credential login | `failure_backoff`, interactive session settings; no resource secret |
-| `anonymous` | No admitted identity | Explicit public admission through a named anonymous authorizer; does not create an end user |
-| `api_key` | `Bearer vsk_...` or `_token` client credentials | `token_ttl_hours` default 1, issuance range 1–24; keys belong to project users |
-| `oauth_oidc` | Browser redirect to external OIDC provider | Issuer/client/scopes/redirect, encrypted client secret, interactive session settings |
-| `jwt` | External asymmetric bearer JWT | Required issuer/audience and exactly one PEM/JWKS key source |
-| `social` | Provider authorization code exchanged server-side | Provider-specific config/secret, optional delegated platform app, interactive session settings |
-| `chat` | Platform-created identity for a bound chat sender | Created on first binding; cannot be manually created; reserved name `chat` also refused |
+| `password` | Native identity/password login | `failure_backoff`, interactive-session config; no resource secret |
+| `anonymous` | Requests without an identity | Must be exposed explicitly via a named anonymous authorizer; creates no end user |
+| `api_key` | `Bearer vsk_...` or `_token` client credential | `token_ttl_hours` default 1, issuance range 1–24; keys belong to project users |
+| `oauth_oidc` | Browser redirect to external OIDC | issuer/client/scopes/redirect, encrypted client secret, interactive-session config |
+| `jwt` | External asymmetric JWT bearer | issuer/audience required; PEM or JWKS, not both |
+| `social` | Server-side authorization-code exchange | Provider-specific config/secrets, optional platform-app delegation, interactive-session config |
+| `chat` | Created by the platform for bound chat senders | Created on first binding; **cannot** be created manually; the reserved name `chat` is refused too |
 
-A default role is used by applicable user-creation flows; it is not an instruction to overwrite all existing users' roles on every request. Do not use a password authorizer as the log attribution for chat binding: the platform's `chat` row identifies that admission path.
+`default_role` is used by applicable user-creation flows — it is **not** a
+per-request instruction overriding every existing user's role. Chat-bound
+calls attribute to the platform `chat` row, not the password authorizer
+that once proved the binding.
 
-## Password backoff and session settings
+## Password failure backoff and sessions
 
-`failure_backoff` missing/null defaults `{after_failures:5,max_delay_secs:900}`. Optional nested `after_failures` integer 0–86400 (0 disables), `max_delay_secs` integer 1–86400. Unknown nested keys/ill-typed values fail validation. Consecutive failures for identity **and client address** cause 1, 2, 4… second delays capped by maximum; success clears streak. Multiple password authorizers use the strictest enabled combination, not the caller-selected easiest one. Global identity/IP throttles still apply.
-
-Shared interactive config on password/OIDC/social: `login_token_ttl_hours` missing/null = 12, integer 1–720; `session` missing/null = no refresh. Object `session` requires `idle_timeout_hours` (1–8760, at least token TTL), optional `max_lifetime_hours` (default 720, explicit value at least idle and at most 8760). Remove/reset these keys in the **complete replacement config**, not by sending a partial nested patch. Full refresh/logout semantics are in [endpoint authentication](endpoints.md).
+- Omitted/null `failure_backoff` defaults to
+  `{after_failures:5,max_delay_secs:900}`; inner `after_failures` is an
+  integer 0–86400 (0 disables) and `max_delay_secs` 1–86400; unknown inner
+  keys/wrong types are rejected.
+- Backoff tracks consecutive failures per identity **and client address**,
+  waiting 1, 2, 4… seconds up to the cap, resetting on success. Multiple
+  password authorizers combine into the **strictest** enabled
+  configuration — callers cannot shop for the loosest entrance. Global
+  identity/IP rate limits still apply.
+- Password/OIDC/social share interactive config:
+  `login_token_ttl_hours` defaults to 12 (integer 1–720) when
+  omitted/null; `session` omitted/null means no refresh; an object must
+  carry `idle_timeout_hours` (1–8760, not below the token TTL) with
+  optional `max_lifetime_hours` (default 720; explicit values ≥ idle and
+  ≤ 8760). To delete/reset a key, send a **full replacement config**, not
+  a nested partial patch. Refresh and logout: [endpoint
+  authentication](endpoints.md).
 
 ## External OIDC (`oauth_oidc`)
 
-Required `config.issuer`, `client_id`, `post_login_redirect_uri`; optional/null `scopes` defaults `["openid","profile","email"]` and, if supplied, must contain exact `openid`; `discovery_cache_ttl_secs` optional 60–86400. Issuer must be HTTPS except HTTP localhost/127.0.0.1. Client ID must be nonblank and at most 512 bytes. Redirect must parse as a URL. Secret is `{"client_secret":"..."}`: required nonblank at creation, at most 1024 bytes; omitted/null or blank on update keeps the stored secret, it does not clear it.
+- Required `config.issuer`, `client_id`, `post_login_redirect_uri`;
+  optional/null `scopes` default to
+  `["openid","profile","email"]` and an explicit list must contain the
+  exact value `openid`; `discovery_cache_ttl_secs` is optional, 60–86400.
+  The issuer must be HTTPS (localhost/127.0.0.1 may use HTTP); the client
+  ID is non-empty ≤512 bytes; the redirect must parse as a URL.
+- Secret shape `{"client_secret":"..."}`: required non-empty ≤1024 bytes
+  at create; omitted/null/blank on update **keeps** the old value and
+  never clears.
 
 ```json
 {"name":"external-login","kind":"oauth_oidc","config":{"issuer":"https://identity.example.invalid","client_id":"fixture-client","scopes":["openid","profile","email"],"post_login_redirect_uri":"https://app.example.invalid/signed-in","discovery_cache_ttl_secs":3600},"secret":{"client_secret":"REPLACE_WITH_PROVIDER_SECRET"},"default_role":"public"}
 ```
 
-Register the exact external-provider redirect `BASE/projects/demo/auth/oidc/external-login/callback`. Browser entry is `GET /projects/demo/auth/oidc/external-login/start`; the callback validates state/code/provider tokens and creates/resolves a project identity, then redirects to configured application URI with Viat login material. Do not expose the provider secret to the browser. This is **not** `/auth/oidc/{name}/start`, which signs platform accounts in. Provider registration, discovery connectivity and real SSO were not tested here.
+Register the exact callback
+`BASE/projects/demo/auth/oidc/external-login/callback` with the provider.
+Flow: browser entry `GET /projects/demo/auth/oidc/external-login/start` →
+the callback validates state/code/provider tokens → creates/resolves the
+project identity → redirects to your app with the Viat login result.
+Never send the provider secret to the browser; this is **not** the
+platform-account `/auth/oidc/{name}/start`. Provider registration,
+discovery-document connectivity and real SSO were not tested here.
 
 ## External JWT (`jwt`)
 
-Required `issuer`, `audience` nonempty strings. Optional `subject_claim` defaults `sub`, if supplied must be a nonempty string. Exactly one mode:
+`issuer` and `audience` are required non-empty; `subject_claim` defaults
+to `sub` (non-empty when provided). Key modes — exactly one:
 
 ```json
 {"name":"external-jwt","kind":"jwt","config":{"issuer":"https://identity.example.invalid","audience":"fixture-api","jwks_url":"https://identity.example.invalid/.well-known/jwks.json","subject_claim":"sub"},"default_role":"public"}
 ```
 
-- PEM: `public_key_pem` plus `algorithm: "RS256"` or `"ES256"`; parseable matching public PEM. This key becomes stale on upstream rotation.
-- JWKS: `jwks_url`, HTTPS or loopback HTTP. Selects published key by token `kid`; supported asymmetric algorithms are RS256/384/512, PS256/384/512, ES256/384. No symmetric shared-secret JWT authorizer and no EdDSA mode are documented here.
+- **PEM**: `public_key_pem` plus `algorithm:"RS256"` or `"ES256"` with a
+  parseable matching public key — it can go stale when the upstream
+  rotates.
+- **JWKS**: `jwks_url` (HTTPS or loopback HTTP) selecting keys by the
+  token's `kid`; supports RS256/384/512, PS256/384/512, ES256/384. There
+  is **no** shared-symmetric-secret JWT authorizer and no EdDSA mode.
 
-Signature, expiry, issuer, audience and subject must pass. The resolved project identity is namespaced by authorizer (`jwt:<authorizer>:<subject>`); do not preseed federated identities from lower-trust project administration. Verified claims can feed declared subject attrs/scope claims; unverified body fields cannot. Rotate JWKS at its owner with overlap; replacing a PEM config is a whole-config update.
+Tokens must pass signature, expiry, issuer, audience and subject
+validation. Project identities are isolated per authorizer
+(`jwt:<authorizer>:<subject>`) — a low-trust project management entrance
+**cannot** pre-seed federated identities; only verified claims can become
+declared subject attrs/scope claims, **never** plain request bodies.
+Leave an overlap window when rotating JWKS upstream; send the full config
+when replacing a PEM.
 
-## Social providers and code flows
+## Social providers and authorization codes
 
-Required `config.provider`, `app_id` (the app ID/corp ID/AppKey). Optional fields:
+Required: `config.provider` and `app_id` (appid/corpid/AppKey). Optional
+fields:
 
-| Field | Default / rule |
+| Field | Default/rules |
 | --- | --- |
-| `agent_id` | WeCom self-built agent ID; required for ordinary WeCom app configuration |
-| `identity_key` | Prefer unionid when available, otherwise native key; allowed choices below |
-| `scopes` | Provider defaults below; entries nonblank, at most 64 bytes |
-| `qr_login` | false; WeCom uses QR rather than in-app H5 when true |
-| `collect_phone` | false; requires provider permissions and phone payload/authorization |
-| `post_login_redirect_uri` | Required for redirect providers; valid URL; not needed for code-only providers |
-| `api_base`, `auth_base` | Provider defaults; test/egress origins, HTTPS or loopback HTTP; host allowlist still applies |
-| `alipay_public_key` | Alipay verification RSA key, required where validated; public, not a secret |
-| `platform_app` | Absent/null means first-party app; name of this project's compatible delegated platform app otherwise |
+| `agent_id` | WeCom self-built app agent ID; required by ordinary WeCom app configs |
+| `identity_key` | Prefers unionid when present, else the native key; allowed values below |
+| `scopes` | Defaults below; each non-empty, ≤64 bytes |
+| `qr_login` | false; WeCom true uses QR instead of the in-app H5 |
+| `collect_phone` | false; needs provider permission and phone authorization/payload |
+| `post_login_redirect_uri` | Required valid URL for redirect-style providers; unnecessary for pure-code providers |
+| `api_base`, `auth_base` | Provider defaults; test/egress origins must be HTTPS or loopback HTTP and still obey the host allowlist |
+| `alipay_public_key` | Alipay verification RSA public key, required where applicable; **not** a secret |
+| `platform_app` | Omitted/null = own app; otherwise a reference to a compatible platform app in this project |
 
-| Provider | Entry/default scopes | Allowed explicit `identity_key` |
+| Provider | Entry/default scopes | Explicit `identity_key` values |
 | --- | --- | --- |
 | `weixin_mp` | WeChat H5 / `snsapi_userinfo` | `unionid`, `openid` |
 | `weixin_open` | Website QR / `snsapi_login` | `unionid`, `openid` |
 | `weixin_mini` | `wx.login` code only / empty | `unionid`, `openid` |
 | `wecom` | In-app H5 or QR / `snsapi_base` | `userid` |
 | `dingtalk` | Browser / `openid` | `unionid`, `openid` |
-| `dingtalk_app` | `dd.getAuthCode` code only / empty | `unionid`, `userid` |
+| `dingtalk_app` | `dd.getAuthCode` only / empty | `unionid`, `userid` |
 | `alipay` | Browser / `auth_user` | `user_id`, `open_id` |
-| `alipay_mini` | `my.getAuthCode` code only / `auth_base` | `user_id`, `open_id` |
+| `alipay_mini` | `my.getAuthCode` only / `auth_base` | `user_id`, `open_id` |
 | `douyin` | Browser / `user_info` | `unionid`, `open_id` |
-| `douyin_mini` | `tt.login` code only / empty | `unionid`, `open_id` |
+| `douyin_mini` | `tt.login` only / empty | `unionid`, `open_id` |
 | `kuaishou` | Browser / `user_info` | `open_id` |
-| `kuaishou_mini` | `ks.login` code only / empty | `open_id` |
+| `kuaishou_mini` | `ks.login` only / empty | `open_id` |
 
-First-party `secret.app_secret` is required for non-Alipay providers (nonblank, <=1024 bytes). Alipay uses `app_private_key` (RSA PEM/base64, <=8192 bytes) and public verification key; `aes_key` is required when Alipay mini-program phone collection needs its own AES decryption. Updates merge nonblank social secret fields over stored ones; omitted/blank does not erase a neighboring field. Switching config must still leave valid provider credentials.
+Secrets: non-Alipay own apps require `secret.app_secret` non-empty
+≤1024 bytes; Alipay uses `app_private_key` (RSA PEM/base64, ≤8192 bytes)
+plus the public verification key; Alipay mini-program phone collection
+needing its own AES decryption requires `aes_key`. Updates merge
+**non-empty** social secrets field-by-field into the existing secret;
+omitted/blank does not erase neighbors; after switching configuration you
+must still hold the new provider's credentials.
 
-Browser routes: `GET /p/{slug}/_social/{name}/start`, provider callback `GET .../callback`. Code route: `POST .../exchange` with required `code`, optional `phone_code`, `phone_data`, `client_id`, `client_secret`, `link`. Mini-program phone data shapes are provider-specific; a phone permission cannot be fabricated by setting `collect_phone:true`. Returned Viat login material follows the interactive-session policy. `link` requires the existing authenticated identity; arbitrary provider code/claimed unionid is not proof of account ownership. Unionid is family/platform-scoped, openid is app-scoped; do not merge unrelated people by a bare string.
+Routes and semantics:
 
-Delegation uses `platform_app` plus authorized account `app_id`; compatible families are listed in [platform apps](platform-apps.md). Moving behind a platform app removes stored app secrets so they cannot silently reactivate later; Alipay mini-program's own phone AES key is retained separately as needed. Reverting to first-party mode requires valid first-party secret material.
+- Browser: `GET /p/{slug}/_social/{name}/start` with the provider
+  callback `GET .../callback`; the code entrance `POST .../exchange`
+  requires `code` with optional `phone_code`, `phone_data`, `client_id`,
+  `client_secret`, `link`.
+- Mini-program phone payloads differ per provider; `collect_phone:true`
+  **cannot** fabricate phone consent. The Viat login result follows the
+  interactive-session policy.
+- `link` requires an existing authenticated identity: submitting a code or
+  claiming a unionid at will **proves no** account ownership. unionid is
+  scoped by platform family/tenant, openid by application — bare strings
+  merge no one.
+- Delegation uses `platform_app` plus the delegated account's `app_id`
+  (compatibility: [platform apps](platform-apps.md)). Transitioning to
+  delegation **removes** the old app secret so it cannot silently return;
+  the Alipay mini-program phone AES key is retained separately as needed.
+  Returning to an own app requires a valid own secret.
 
-## Safety, failure handling and cleanup
+## Security, failures and cleanup
 
-A valid authorizer configuration is not an end-to-end provider test. Confirm callback origin and TLS trust, provider permissions, project role assignment, published allowed-authorizer list and a denied caller. Expect validation `400`, name conflict `409`, absent object `404`, and editor failure `403`; login/exchange may additionally fail state, upstream network, token or scope checks. Do not make issuer/audience optional or disable TLS verification to bypass errors.
+- Passing validation **does not** mean provider integration works: verify
+  callback origins/TLS trust, provider permissions, project roles, the
+  published authorizer list and denial cases.
+- Common errors: `400` bad config, `409` name conflict, `404` missing
+  object, `403` insufficient editor rights; logins/exchanges can still
+  fail on state, upstream networking, tokens or scopes. **Never** make
+  issuer/audience optional or disable TLS verification to "get past" a
+  problem.
+- Rotation: rotate secrets in place and retire the old upstream
+  credential only after new logins verify; deleting the Viat row
+  **unregisters nothing** upstream.
+- Cleanup: clear endpoint references and review the publish plan before
+  removing an isolated authorizer; credentials never enter repo-sync
+  config or copied provider responses.
 
-Use in-place secret rotation; verify new logins, then retire upstream old credentials. Deleting the Viat row does not revoke an upstream app registration. Remove disposable authorizers only after removing endpoint dependencies and reviewing the publish plan. Credentials never belong in repo-sync config or copied provider responses.
+## Verification basis
 
-**Evidence:** `crates/viat-core/src/types/authorizer.rs`, `crates/viat-api/src/{dto.rs,handlers/authorizers.rs,handlers/oidc.rs,social/mod.rs,social/handlers.rs,login_backoff.rs,project_session.rs,middleware_project.rs}`, `crates/viat-auth/src/jwt.rs`. All recipes are unexecuted.
+Contract source `03751a67`: `crates/viat-core/src/types/authorizer.rs`,
+`crates/viat-api/src/{dto.rs,handlers/authorizers.rs,handlers/oidc.rs,social/mod.rs,social/handlers.rs,login_backoff.rs,project_session.rs,middleware_project.rs}`,
+`crates/viat-auth/src/jwt.rs`. Every recipe is unexecuted.

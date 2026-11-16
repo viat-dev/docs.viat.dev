@@ -265,7 +265,7 @@ viat schedule update demo_tick --every-secs 3600 --script demo_echo --disabled
 
 **失败处理、验证与清理。** 触发器无效、缺目标、非对象输入或目标不存在会失败。本版本这些 API 写入不同于内容编辑，只需成员身份。用 schedule show 验证；用完 pause/delete demo_tick。update 前保存完整旧 trigger/target/inputs/enabled。
 
-## 实现核对依据
+## 核验依据
 
 语法来自固定 Clap 合同与 main.rs；行为/权限核对以下源文件，路径相对产品仓库根。
 

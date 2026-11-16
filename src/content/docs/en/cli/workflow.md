@@ -212,7 +212,7 @@ viat workflow update demo_flow --file demo-workflow.yaml
 
 **Failure handling, verification and cleanup.** Definition validation failures exit 1. Preserve previous YAML, verify show, test only with opt-in to real effects; restore previous definition to undo draft changes.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

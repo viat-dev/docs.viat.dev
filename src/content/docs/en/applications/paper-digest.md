@@ -120,6 +120,10 @@ Skip unpublish if the leaf was never published. Delete the `paper-digest` tree w
 
 ## Contracts and remaining checks
 
-See [repo sync](../projects/repo-sync.md), [HTTP resources](../assets/resources/http_api.md), [SQLite](../assets/resources/sqlite.md), [workflows](../assets/workflows/overview.md), [schedules](../triggers/schedules.md) and [endpoint auth](../auth/endpoints.md). Maintenance evidence: pinned product `crates/viat-cli/src/repo/{resources,endpoints,schedules}.rs`, `crates/viat-runtime/src/python.rs`, and registered API routes in `crates/viat-api/src/lib.rs`.
+See [repo sync](../projects/repo-sync.md), [HTTP resources](../assets/resources/http_api.md), [SQLite](../assets/resources/sqlite.md), [workflows](../assets/workflows/overview.md), [schedules](../triggers/schedules.md) and [endpoint auth](../auth/endpoints.md).
 
 Remaining manual checks: approved server paths/destination policy, resource resolution, real RSS encoding/size, SQL-broker semantics under concurrent workers, chosen model JSON/cost/privacy, schedule admission/timing, published auth denial, downstream idempotency and delivery. Local fixtures do not establish any of these.
+
+## Verification basis
+
+Maintenance evidence: pinned product `crates/viat-cli/src/repo/{resources,endpoints,schedules}.rs`, `crates/viat-runtime/src/python.rs`, and registered API routes in `crates/viat-api/src/lib.rs`.

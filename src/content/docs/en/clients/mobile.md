@@ -8,97 +8,181 @@ channel: stable
 
 # Native client operations
 
-The native client is an operational companion, not a local Viat server or a replacement for every console editor. This page describes the **0.1 client line with server 1.1.0**. Its Home, Assistant and Settings screens are shared by the Mac and phone shells; native storage, notification registration and Widget behavior differ by platform. Current screen labels quoted below are English.
+The native client is an **operational companion** — not a Viat server on
+the device and not a replacement for every console editor. This page
+covers the **0.1 client line with server 1.1.0**. The Home, Assistant
+and Settings screens are shared by the Mac and phone shells; native
+storage, notification registration and Widget behavior differ per
+platform. Quoted screen labels are the current English ones.
 
-Obtain a correctly signed artifact through your deployment's approved distribution channel; [client installation](../installation/clients.md) explains platform prerequisites. A public App Store/TestFlight/DMG download channel is not established by this handbook. A development IPA does not authorize installation on arbitrary iPhones.
+Obtain correctly signed artifacts through deployment-approved channels;
+platform prerequisites: [client installation](../installation/clients.md).
+This manual establishes **no** public App Store/TestFlight/DMG download
+channel; a development IPA does not authorize every iPhone.
 
-## Connect the correct instance and identity
+## Connect the right instance and identity
 
-You need network access from the device to the instance, a valid platform account, an activated deployment and project membership. A project end-user token is not a platform login. A phone outside the intranet cannot reach a private instance simply because its Mac can.
+The device must reach the instance with a valid platform account, an
+activated deployment and project membership; a project end-user token is
+**not** a platform login. The Mac reaching an intranet says nothing about
+a phone outside it.
 
-1. Open the instance picker or **Settings → Instances**, and add the deployment.
-2. Enter its base URL, including an operator-configured proxy prefix but not `/ui/` or `/p/<slug>`. Use HTTPS for remote deployments; do not embed a password or bearer in the URL.
-3. Save, select the instance, and sign in using the offered password/MFA or configured SSO flow. Complete required MFA enrollment in the supported login flow rather than trying to bypass it.
-4. Select an accessible project in Home or **Settings → Project**. This is one app-wide project selection, not two independent settings.
-5. Confirm the instance label, deployment URL and project before approving any write.
+1. Open the instance switcher or **Settings → Instances** and add the
+   deployment.
+2. Enter the base URL: include any operations-configured reverse-proxy
+   prefix, **exclude** `/ui/` and `/p/<slug>`; use HTTPS remotely;
+   **never** embed passwords or bearers in the URL.
+3. Save, select the instance and sign in via password/MFA or the
+   configured SSO flow; when MFA enrollment is required, complete the
+   supported flow — never attempt bypasses.
+4. Pick an accessible project in Home or **Settings → Project** — the
+   **same** app-wide selection, not two unrelated settings.
+5. Before approving any write, verify the instance name, deployment URL
+   and project.
 
-| Instance field | Rules and effect |
+| Instance field | Rules and effects |
 | --- | --- |
-| Name | Optional; whitespace trimmed. Empty uses a host-derived label; an explicit name is limited to 32 characters. Renaming is not changing the server or minting a new login. |
-| Base URL | Required valid `http`/`https` URL with a host. Outer whitespace and trailing `/` are removed. Save does not prove reachability, certificate trust, activation or successful login. |
-| Active instance | Determines foreground requests and assistant context. Sessions/project selections are instance-scoped. |
-| Selected project | Determines overview, live logs, resource rotation and notification settings. Membership and each API's role checks still apply. |
+| Name | Optional, trimmed; empty uses a hostname-derived label; explicit names ≤32 characters. Renaming ≠ switching servers or creating a login. |
+| Base URL | Required, a valid `http`/`https` URL with a host; trimmed of whitespace and trailing `/`. Saving **proves no** reachability, trust, activation or login. |
+| Active instance | Drives foreground requests and assistant context; sessions and project selection are per-instance. |
+| Selected project | Drives overview, live logs, resource rotation and notification settings — still bounded by membership and each API's role checks. |
 
-Do not put a different deployment behind an existing saved URL merely to reuse credentials. When repointing or removing an instance, expect local session/context cleanup and sign in to the new identity explicitly. A failed secure-store cleanup is an error to resolve, not permission to proceed with an uncertain identity.
+**Never** swap another deployment behind an existing saved URL to reuse
+credentials. Editing an instance's target or removing it should be
+expected to clear local sessions/context — sign in as the new identity
+deliberately. A failed secure-storage cleanup is an **error to resolve**,
+not a reason to continue with uncertain identity.
 
 ## Home: overview and live evidence
 
-The overview defaults to **24h**; available windows are `1h`, `24h`, `7d`, `30d`. Use Refresh for a new sample and read its timestamp. Home presents traffic, failing endpoints, schedules, executions and runs. Selecting a different instance/project/window invalidates old responses so an earlier slow request should not populate the new view.
+- The overview defaults to **24h** with windows `1h`/`24h`/`7d`/`30d`;
+  use Refresh for fresh samples and read the timestamps. Home shows
+  traffic, failing endpoints, schedules, executions and runs; switching
+  instance/project/window invalidates old requests — a slower old
+  response must **not** overwrite the new view.
+- Live logs are a **separate stream**: you get live events from start,
+  not a history export; the UI keeps at most **200** lines; switching
+  projects or leaving Home stops it. Historical filtering:
+  [CLI logs](../cli/logs.md). Server-rejected requests can still have
+  execution records — even when no script ran.
+- A server `unauthorized` returns the app to the login screen rather
+  than keeping a nominally signed-in UI; a mere network error **proves
+  no** account revocation. [Widget behavior](widgets.md) is separate:
+  cached Widget numbers are not an open Home connection.
 
-Live logs use a separate stream. Starting it produces live events, not a historical export. The screen retains at most **200** displayed lines; changing project or leaving Home stops that stream. Use [CLI logs](../cli/logs.md) for historical filtering/export workflows. A server-side refusal may have an execution record even when no script ran.
+## Rotating resource credentials
 
-A server `unauthorized` result returns the app to sign-in rather than leaving a nominally logged-in screen. A network error alone is not proof that the account was revoked. Check [Widget behavior](widgets.md) separately: cached Widget numbers are not the same as an open Home connection.
+**Settings → Project → Resources** is deliberately narrower than the
+console's full resource editor: it shows a resource's qualified name,
+kind and declared secret field names — **never echoing** stored secret
+values and not editing arbitrary `plain` fields. PATCHing needs project
+Owner/Admin/Developer; **seeing** an entry is not **modifying** it.
 
-## Rotate a resource credential
+1. Pick the project and resource, noting its folder-qualified name.
+2. Fill only the fields to replace: untouched fields are **omitted** and
+   the server keeps current values.
+3. A field filled then cleared submits as `""` — a **deliberate clear**,
+   not an omission; per-kind validation may reject invalid credential
+   combinations.
+4. After saving, run the approved [resource-type verification
+   flow](../assets/resources/index.md) — a successful save is **not**
+   an upstream connectivity test.
+5. Deactivate old credentials at the issuer only after considering
+   dependencies and rollback needs.
 
-**Settings → Project → Resources** is deliberately narrower than the console's full resource editor. It lists qualified resource names, kinds and declared secret-field names; it does not display their stored secret values or edit arbitrary `plain` fields. Project Owner/Admin/Developer permission is required for the PATCH; a visible row does not imply permission to change it.
+Cancel closes the draft without a PATCH. **Never** paste provider
+secrets into the assistant or diagnostic logs; this management view's
+masking does not remove the [1.1 script resource projection
+limits](../overview/concepts.md).
 
-1. Select the project and resource, including its folder-qualified name.
-2. Enter only fields you intend to replace. Untouched fields are **omitted** and preserved by the server.
-3. A field you type into and then clear is sent as `""`. That is an intentional clear, **not** omission; per-kind validation can reject an invalid credential combination.
-4. Save, then validate the resource using an appropriately authorized [resource-specific procedure](../assets/resources/index.md). A successful save is not an upstream connection test.
-5. Retire the old credential at its issuer only after dependent use and rollback requirements have been considered.
+## Assistant configuration and approvals
 
-Cancel closes the draft without sending the PATCH. Do not paste a provider secret into the assistant or a diagnostic log. This management view's redaction does not remove the [1.1 script-projection limitations](../overview/concepts.md).
-
-## Assistant configuration and approval
-
-The assistant is an **interactive client capability**, not the server's scheduled workflow engine. Its provider configuration and keys are app-local, shared across saved instances; provider keys occupy separate provider slots. They are not automatically the project's `llm` resource credentials.
+- The assistant is an **interactive client capability**, not a
+  server-side scheduled workflow engine. Provider configuration and keys
+  live locally in the app, shared across saved instances, with keys
+  slotted per provider; they **never** automatically become project
+  `llm` resource credentials.
 
 In **Settings → Assistant**:
 
 | Setting | Behavior |
 | --- | --- |
-| Provider | `anthropic` or `openai` (OpenAI-compatible chat/completions). This selects the protocol, not proof that any vendor/model is compatible. |
-| Model | Trimmed string. The compatible-provider path requires a nonempty model before asking; the Anthropic path uses its bundled client default when empty. Choose a model available to your own account. |
-| API base URL | Used by the compatible-provider path, which requires it before asking. Whitespace/trailing `/` are trimmed. Configure the API root expected by that provider; no network test happens merely by saving. |
-| API key | Per-provider secret; blank/whitespace-only saves are refused. A new value replaces that provider's saved key. Remove deletes that provider's stored key, not the provider account or a key at the issuer. |
+| Provider | `anthropic` or `openai` (OpenAI chat/completions compatible). Choosing a protocol **proves no** arbitrary vendor/model compatibility. |
+| Model | Trimmed. Compatible-provider paths require a non-empty model before asking; an empty Anthropic path uses the client-bundled default. Pick a model your account can use. |
+| API base URL | Used by compatible-provider paths; non-empty required before asking; trimmed of whitespace and trailing `/`. Enter the provider's expected API root — saving itself performs **no** network test. |
+| API key | Per-provider stored secret. Blank cannot be saved; a new value replaces that provider's old key. Remove deletes the **local** key — deleting no provider account and revoking nothing at the issuer. |
 
-Save provider settings and the selected provider's key separately. A displayed “key saved” is not validation of its scope, quota or model access. A compatible provider with an empty model/base URL returns `incomplete_config` on an actual request. Provider requests may incur charges and transmit prompt/tool-result data; keep sensitive material out unless that processing is approved.
-
-The assistant proposes **write_script**, **test_run** and **publish** actions through an approval card. Inspect its instance URL, project, source diff or arguments. Approve executes against the server; Decline does not authorize that proposal. A test run can have real resource side effects. Publish applies **all pending project changes**, not only a script mentioned in chat; server warnings require separate acknowledgement. Changing account/instance/project/provider invalidates stale assistant context rather than transferring old approval to a new target.
-
-Do not treat the confirmation UI as authorization to run arbitrary future actions or as a replacement for server permissions. Read-only tool results can still contain private project data and influence the model; an instruction in returned content is not an operator approval.
+- Save the provider configuration and the chosen provider's key
+  separately. "key saved" **proves no** permission/quota/model access; a
+  compatible provider missing model/base URL returns `incomplete_config`
+  on real requests. Requests can cost money and transmit prompts/tool
+  results — **never** pass sensitive material without approval.
+- The assistant proposes **write_script**/**test_run**/**publish**
+  operations via approval cards: inspect the instance URL, project,
+  source diff or arguments. Approve executes server-side; Decline
+  authorizes nothing. Test runs can really invoke resources; **Publish
+  ships every pending change in the whole project** — not just the
+  script discussed in chat; server warnings need separate confirmation.
+  Switching account/instance/project/provider invalidates old assistant
+  context — approvals **never** transfer to the new target.
+- The confirmation UI is not "authorization for arbitrary future
+  actions" and replaces no server-side permissions; read-only tool
+  results can still contain private project data and steer the model;
+  instructions inside returned content are **not** operator approval.
 
 ## Phone notification registration
 
-**Settings → Project → Push notifications** binds this handset to a selected project push resource. This is ordinary alert/run notification delivery, **not encrypted Widget overview snapshots**.
+**Settings → Project → Push notifications** binds this phone to the
+selected project's push resource. These are ordinary alert/run
+notifications — **not** the encrypted Widget overview snapshot.
 
-| Native build | Registration source | Required matching resource |
+| Native build | Registration source | Resource that must match |
 | --- | --- | --- |
-| iOS | APNs device token; valid provisioning and notification entitlement/permission | `push` with APNs configuration matching the build's environment/topic |
-| Android source build | JPush SDK registration ID | Matching JPush push resource and app setup |
-| Mac desktop | No phone registration SDK | Phone push registration is unsupported |
+| iOS | APNs device token (valid provisioning, notification entitlement/permission required) | An APNs-configured `push` with environment and topic matching the build |
+| Android source build | JPush SDK registration ID | A matching JPush push resource and app settings |
+| Mac desktop | No phone registration SDK | Phone-push registration **unsupported** |
 
-A project must already have a suitable resource. An empty registration ID is a retryable `not_ready` state while the native token arrives, not a fabricated success. Provisioning or APNs registration errors require correcting the native build/account setup. Enabling registers this handset; it does not demonstrate provider acceptance or device delivery. Never select an unrelated provider resource just because it appears in the list.
-
-Disable before retiring a binding; sign-out attempts account-specific cleanup. Project switching is not permission to send a test notification. Actual message delivery and external-provider cleanup require deliberate opt-in; see [Push resources](../assets/resources/push.md).
+- The project must **already** have a suitable resource. An empty
+  registration ID from a not-yet-arrived native token is a retryable
+  `not_ready` — **not** an invented success; provisioning or APNs
+  registration errors need native build/account fixes. Enable registers
+  this phone and **proves neither** provider acceptance nor device
+  delivery. Never pick a mismatched provider just because one appears in
+  the list.
+- Disable before retiring a binding; sign-out attempts per-account
+  cleanup. **Switching projects is not permission to send test
+  notifications.** Real delivery and provider cleanup need explicit
+  enablement — see [Push resource](../assets/resources/push.md).
 
 ## Storage, failures and cleanup
 
-**Settings → About** shows the deployment and storage self-check. Native credential storage failures must not be confused with a server password failure. Follow the reported store state; do not claim sessions will survive restart when storage is degraded or ephemeral. Do not copy raw secure-store contents into support reports.
+- **Settings → About** shows deployment and storage self-checks. **Never**
+  misread a native credential-store failure as a server password error:
+  act on the reported storage state; under degraded or ephemeral storage
+  no post-restart login retention is promised. **Never** copy raw
+  secure-storage contents into support tickets.
 
-| Symptom | Verify and recover |
+| Symptom | Check and recovery |
 | --- | --- |
-| No projects | Confirm the instance and platform identity, then membership; create/manage projects in the console or CLI. |
-| Overview unavailable | Verify device-side DNS/network/TLS, activation, membership and the selected project. Do not replace missing data with zero. |
-| Resource save forbidden | Check effective project role and field-specific validation; listing a resource is not editing permission. |
-| Assistant has no usable provider | Save provider/model/root/key as appropriate, then verify account access without disclosing the key. |
-| Write card targets an unexpected project | Decline; correct instance/project selection and request a new proposal. |
-| Push says unknown/not ready | Distinguish state-load failure from pending native registration; inspect the exact error and matching provider. |
+| No projects | Verify instance, platform identity and membership; create/manage projects via console or CLI |
+| Overview unavailable | Check device-side DNS/network/TLS, activation, membership and selected project; **never** substitute zeros for missing data |
+| Resource save refused | Check the effective project role and field validation; list permission is not modify permission |
+| Assistant has no usable provider | Save provider/model/root/key as required; verify account permissions without exposing the key |
+| Approval card targets an unexpected project | Decline; fix instance/project and re-propose |
+| Push shows unknown/not ready | Distinguish a status read failure from incomplete native registration; check the specific error and provider match |
 
-For a shared or retired device, disable applicable notification bindings, sign out of each account and remove saved instances as intended. Review app-local provider keys separately. Uninstalling an app is not guaranteed to revoke server sessions, delete Keychain material, remove project assets or revoke provider credentials. Previously rendered Widget images can remain until the OS redraws them.
+Sharing or retiring a device: disable applicable notification bindings →
+sign out each account → remove instances as needed; check the app's
+local provider keys separately. Uninstalling the app **guarantees no**
+server-session revocation, Keychain clearing, project-asset deletion or
+provider-credential revocation; already rendered system Widget images
+may persist until the next redraw.
 
 ## Verification basis
 
-Pinned source `03751a67`: `client/src/{App,home/Home,settings/ProjectSettings,settings/AssistantSettings,settings/AboutSettings,write/WriteConfirmModal}.tsx`, `client/src-tauri/src/{instances,lib,push}.rs`, `crates/viat-client/src/resources.rs`, `packages/frontend-core/src/index.ts`. These operations were source-reviewed for the handbook; this page is not a claim of fresh device/provider acceptance.
+Pinned source `03751a67`:
+`client/src/{App,home/Home,settings/ProjectSettings,settings/AssistantSettings,settings/AboutSettings,write/WriteConfirmModal}.tsx`,
+`client/src-tauri/src/{instances,lib,push}.rs`,
+`crates/viat-client/src/resources.rs`,
+`packages/frontend-core/src/index.ts`. This page is source-verified; no
+device or provider acceptance was re-run for it.

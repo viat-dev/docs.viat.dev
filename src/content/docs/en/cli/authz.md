@@ -77,7 +77,7 @@ viat authz rule set-origin 00000000-0000-4000-8000-000000000001 --origin delegat
 
 **Failure handling, verification and cleanup.** Inspect dry-run before handing ownership away: future push mirrors only platform-owned rules. To undo, explicitly set the same IDs back to previous origin. After partial failure list/reconcile, then rerun remaining work; no all-rules transaction.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 
