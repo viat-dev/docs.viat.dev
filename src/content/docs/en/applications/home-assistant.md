@@ -126,6 +126,10 @@ Skip unpublish for leaves never published. Delete `home-assistant` with `viat tr
 
 ## Reference and remaining requirements
 
-[HTTP resource](../assets/resources/http_api.md), [script context](../assets/scripts/context.md), [endpoint binding](../triggers/http.md), [authentication](../auth/endpoints.md), [repo sync](../projects/repo-sync.md). Maintenance evidence: pinned product `crates/viat-runtime/src/{python,resources_json}.rs`, `crates/viat-cli/src/repo/endpoints.rs` and registered handlers in `crates/viat-api/src/lib.rs`.
+[HTTP resource](../assets/resources/http_api.md), [script context](../assets/scripts/context.md), [endpoint binding](../triggers/http.md), [authentication](../auth/endpoints.md), [repo sync](../projects/repo-sync.md).
 
 Remaining external requirements: an approved HA origin/CA/routing, privately provisioned token, real isolated entity IDs, active project-user UUIDs and login, explicit device approval and manual integration verification. The offline unit validator is deliberately not advertised as connector/device coverage.
+
+## Verification basis
+
+Maintenance evidence: pinned product `crates/viat-runtime/src/{python,resources_json}.rs`, `crates/viat-cli/src/repo/endpoints.rs` and registered handlers in `crates/viat-api/src/lib.rs`.

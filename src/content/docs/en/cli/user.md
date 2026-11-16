@@ -449,7 +449,7 @@ viat user set-role teammate@example.invalid operator
 
 **Failure handling, verification and cleanup.** Promote another Owner before last-owner demotion. Record old role, verify user ls, restore original role to undo. Do not use platform elevation merely to fix project membership.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

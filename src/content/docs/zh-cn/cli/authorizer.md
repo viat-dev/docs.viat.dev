@@ -167,7 +167,7 @@ viat authorizer update demo_password --clear-default-role
 
 **失败处理、验证与清理。** 无选项/角色不存在失败。记录旧角色名并 update 恢复；省略不等于清除。show 验证，审查新解析客户端身份的影响。
 
-## 实现核对依据
+## 核验依据
 
 语法来自固定 Clap 合同与 main.rs；行为/权限核对以下源文件，路径相对产品仓库根。
 

@@ -166,7 +166,7 @@ viat role show demo_role --json
 
 **Failure handling, verification and cleanup.** Unknown role fails. Use JSON for description/id; no mutation/cleanup.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

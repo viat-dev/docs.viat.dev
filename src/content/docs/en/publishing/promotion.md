@@ -9,72 +9,176 @@ contract_ids: ["cli.export", "cli.import", "cli.push", "cli.pull", "cli.publish.
 
 # Promoting a project between environments
 
-Viat 1.1.0 has **no native promote command, named environment pipeline, or API that copies an immutable endpoint snapshot to another instance**. Promotion means moving reviewed **draft definitions** with repo sync or export/import, provisioning destination-only settings/secrets/data, then publishing there. Server release and CLI/client version are independent; use matching stable contracts and test-host versions. An export is neither a snapshot-history archive nor a backup of upstream databases/files.
+Moving a Viat project from one instance to another (dev → staging → production)
+means: **move the reviewed draft definitions**, provision settings/secrets/data
+on the target, then publish there.
 
-This page is an operational recipe derived from source, **not executed**. No project was created, package extracted, credentials moved, tests/builds or network/provider calls performed. Obtain approval for remote writes, migration, tests with real resources, publishing and cleanup before running the corresponding steps.
+Three facts shape everything below:
+
+1. 1.1.0 has **no native promote command, no named-environment pipeline, and
+   no API that copies an immutable endpoint snapshot to another instance**.
+   "Promotion" is draft migration via repo sync or export/import.
+2. Server release and CLI/client versions are independent; the target needs
+   matching stable contracts and test-host versions.
+3. An export is neither a snapshot-history archive nor a backup of upstream
+   databases/files.
+
+> [!WARNING]
+> This recipe is source-derived and **not executed**: no project was created,
+> no package extracted, no credentials moved, no tests/builds or
+   network/provider calls performed. Obtain explicit approval before remote
+   writes, migrations, tests with real resources, publishing or cleanup.
 
 ## Permissions and prerequisites
 
-- Source: platform login and project membership for ordinary reads; full exports can need editor-gated reads such as queue/WS-trigger definitions. Do not promise Operator can export every object.
-- Destination: platform login, ability to create a project if new; content-edit rights for existing assets, Owner/Admin for owner-level project/auth settings and publication. Import is multi-stage, not an all-or-nothing remote transaction.
-- A complete reviewed source checkout or trusted `.viatpkg`, an explicit destination slug/server/session, isolated staging resources, compatible schema/data/migrations, required language runtimes/toolchains and external credential provisioning.
-- Secure local working directory. Protect `.viat` session tokens, packages, sources/plain resource config and any manually provisioned secrets. Export placeholders are **not credentials**.
+- **Source**: ordinary reads need a platform login and project membership; a
+  complete export may additionally need editor-gated reads such as
+  queue/WS-trigger objects — Operator-level export of everything is not
+  guaranteed.
+- **Target**: a platform login plus the ability to create a new project;
+  changing existing assets needs content-edit rights, and project/auth
+  high-privilege settings plus publishing need Owner/Admin. Import is
+  multi-stage, not one remote atomic transaction.
+- **Materials**: a fully reviewed checkout or a trusted viatpkg; known target
+  slug/server/session, isolated staging resources, compatible
+  schema/data/migrations, required language toolchains and external
+  credential provisioning.
+- **Locally**: a safe directory protecting the `.viat` session, packages,
+  source/plain config and manual secrets; placeholder values in an export
+  **are not credentials**.
 
 ## What travels and what does not
 
-| Surface | Promotion behavior |
+| Area | Behavior |
 | --- | --- |
-| scripts/workflows/endpoints/trees | Draft definitions; folder names are identity. Active snapshot versions/revision history are not transported. |
-| resources | Public/plain config and secret placeholders, not reusable secret values. Source hostnames may be unsuitable at destination. |
-| schedules/watches/queue_triggers/ws_triggers | Repo-backed live config; creating/enabling can start activity **before endpoint publication**. Review enabled flags, roots, broker/feed destinations and defaults first. |
-| IM | `im/accounts` resource-backed accounts, `im/triggers` and groups in their supported shapes sync under chat. Inline/QR credential accounts are skipped by pull and protected from mirror deletion; re-provision/bind at destination with consent. A copied trigger may refer to a nonportable account. |
-| authorization/repo metadata | Only fields represented by viat.yaml/repo model; not every console setting/client identity. Model version/destructive changes have their own guard/approval. |
-| runtime artifacts/data | Not general upstream DB rows, managed-file bytes, execution history, end-user credentials, device registrations, provider bot binding, external queued messages, arbitrary local watch files or server deployment configuration. Plan separately. |
-| tests | Local tests/cassettes can travel in your source checkout; do not assume export/import carries every local non-repo fixture or server saved regression case. Verify saved cases explicitly at destination. |
+| scripts/workflows/endpoints/trees | Draft definitions; folder is identity. Active snapshot versions and revision history **do not travel**. |
+| resources | Plain config and secret placeholders; reusable secrets **do not travel**, and source hostnames may not suit the target. |
+| schedules/watches/queue_triggers/ws_triggers | Live config as the repo supports it; creation/enablement can start activity **before endpoints publish** — check enabled/root/broker/feed/default first. |
+| IM | Syncs im/accounts resource accounts, im/triggers and supported groups; inline/QR accounts are skipped on pull and not deleted on push-missing — the target must knowingly reconfigure/re-scan; copied triggers may reference non-portable accounts. |
+| Authorization/repo meta | Only what viat.yaml/repo can express, not every console setting or client identity; model versions and breaking changes have separate guards/approvals. |
+| Run artifacts/data | **Excludes** business database rows, managed file bytes, execution history, user credentials, device registrations, provider bindings, external queued messages, arbitrary watch files, server deployment config — plan these separately. |
+| Tests | A local checkout can carry tests/cassettes; do not assume export/import carries every non-repo fixture or server-saved case — verify explicitly on the target. |
 
-`pull` reads remote **drafts**, not published content. If the goal is “what is live now”, reconcile source draft-vs-snapshot first; otherwise a perfectly successful export can deploy unpublished work. Ordinary frozen script uses can be reviewed as a closure, while workflow step uses stay live including nested workflows; see [snapshot boundaries](snapshots.md).
+`pull` reads remote **drafts**, not published content. If what you want is "the
+currently live version", reconcile draft-vs-snapshot first — a successful
+export can otherwise deploy unpublished work. For dependency review: ordinary
+script `uses` can be reviewed as a frozen closure; workflow step uses
+(including nested) stay live — see [snapshot boundaries](snapshots.md).
 
-## Package route: create and import
+## Package path: export and import
 
-Syntax examples use synthetic names and are unexecuted:
+Example syntax, unexecuted:
 
 ```sh
 viat export source-demo --output source-demo.viatpkg
 viat import source-demo.viatpkg --as staging-demo
 ```
 
-Export freshly pulls the selected/positional source into temporary staging, creates gzip-tar `.viatpkg`, cleans staging. `--output` default is `./<slug>.viatpkg`; existing file can be overwritten. `--only` selects supported kinds (repeat/comma-separated per CLI), not a dependency solver. Keep bundles private even without secrets.
+**export** re-pulls the specified/selected source into a temporary staging,
+packs a gzip-tar viatpkg and cleans up. `--output` defaults to
+`./<slug>.viatpkg` and may overwrite an existing file; `--only` selects kinds
+with the CLI's repeat/comma syntax — it is not a dependency solver. Keep the
+package private even when it contains no secrets.
 
-Import accepts required package FILE, optional `--as <slug>` (otherwise bundle slug), `--only`, `--prune:false`, `--update-resources:false`. It creates missing project or upserts into existing one, **does not select it in your CLI**, and does **not publish or run DB migrations**. Confirm server/login before invocation; current selected project is not a replacement for `--as`.
+**import** requires FILE; optional `--as` (default: the package slug),
+`--only`, `--prune` (default false) and `--update-resources` (default false).
+A missing project is created, otherwise upsert; import **does not select the
+project, does not publish, does not run database migrations**. Confirm
+server/login first; the current selected project cannot stand in for `--as`.
 
-Resource import is intentionally conservative:
+Resource import is deliberately conservative:
 
-- New secret-bearing resources without secrets are skipped and reported; fill destination credentials safely, then re-evaluate definitions.
-- Existing secret-bearing resources are kept **entirely** by default, not just their secret fields, so source host/port cannot silently redirect destination credentials.
-- `--update-resources` opts into changing their imported settings; it does not magically obtain missing credentials. Review resulting destination addresses before use.
-- Skipped/kept-resource summaries do **not** automatically make import exit nonzero. A green import can still leave dependencies missing or old.
-- `--prune` explicitly deletes represented remote-only items; default import is non-destructive upsert. It is not equivalent to ordinary mirror push.
+- New resources needing secrets are **skipped and reported** — no credentials
+  exist for them; provision target credentials safely, then re-evaluate the
+  definitions.
+- Existing resources with secrets are **kept whole** by default (not just the
+  secret fields), so source host/ports cannot redirect target credentials.
+- `--update-resources` explicitly allows updating their imported config but
+  conjures no missing credentials; re-check target addresses before use.
+- The skipped/kept summary **does not automatically fail the import** — a
+  success can still lack dependencies or keep old values.
+- `--prune` explicitly deletes remote-only items inside the expressed scope;
+  the default is non-destructive upsert, unlike an ordinary mirror push.
 
-Output is progress/imported-project/pending-publish/skipped-secret/kept-resource summaries, **not** a publish result. Import has no dedicated `--json` success shape. Failure may occur after earlier remote writes; inspect completed stages and current state before retrying. There is no single undo token or transactional cancellation for a partially applied import.
+Output is progress/imported project/pending publish/skipped secret/kept
+resource — not a publish response; there is no dedicated `--json` success
+shape. Earlier stages may already have written before a failure: check the
+target's actual state before retrying; there is no unified undo token or
+transactional cancel.
 
-## Repo route and destructive boundaries
+## Repo path and destruction boundaries
 
-A source checkout includes `viat.yaml`, scripts/workflows/resources, `endpoints/<tree>/`, schedules/watches/queue_triggers/ws_triggers, IM directories, crate sources and supported migrations. Use dedicated per-environment session/config directories and verify selected project/server before `viat pull`, `viat project diff` or `viat push`. Session discovery does not change CWD. Never pull into an unreviewed dirty working tree expecting it to preserve all local work.
+A checkout contains viat.yaml, scripts/workflows/resources,
+`endpoints/<tree>/`, the trigger directories, IM, the crate and supported
+migrations. Use a dedicated session/config per environment; confirm the
+selected server/project before pull/project diff/push; session discovery
+never changes your CWD. Do not pull into an unreviewed dirty directory and
+expect all local work to survive.
 
-Ordinary push is not uniformly non-destructive: scripts/workflows/resources normally upsert, while endpoint/trigger/meta mirrors can delete missing remote config; authz migrations/model guards and system-asset exclusions add their own rules. A partial `--only`/partial checkout is not automatically safe. `$secret` export marker is stripped, `$keep` is top-level preservation of an existing plain value, and supported `$secret:` resource references are a different mechanism; none supplies a missing destination credential. See [complete sync reference](../cli/sync.md).
+An ordinary **push is not uniformly non-destructive**:
 
-Do not invent standalone commands for watch/queue/WS/IM trigger kinds: repo sync/API is their supported automation surface. Keep enabled false in **live trigger** definitions until target resources, broker DLQ/ack timeouts, watch roots and provider identities are verified. Scanned account protection does not make its copied trigger safe to enable elsewhere.
+- scripts/workflows/resources usually upsert;
+- endpoint/trigger/meta mirroring can delete remote items that are missing
+  locally;
+- authz model guards, migrations and system-asset exclusions follow their own
+  rules;
+- partial `--only`/checkout combinations are not automatically safe.
 
-## Test, publish and recover
+`$secret` export markers are stripped; `$keep` only preserves existing
+top-level plain values; `$secret:` resource references in supported positions
+are yet another mechanism — none of them conjures missing target secrets. Full
+rules: [sync reference](../cli/sync.md).
 
-1. Review imported state/diff, fill missing destination resources and credentials, refresh schema, apply explicitly reviewed DB/authz migrations using their supported commands. Migration execution is separate from import/push; back up data and check compatibility with rollback targets.
-2. Run local fake-resource suites/endpoint fixtures only after opting into the necessary local DB/toolchain actions. Confirm real-resource saved cases are isolated before invoking the server gate. Offline fixture publishing acknowledges warnings/test failures internally and is not proof gates passed.
-3. Select the **destination** project explicitly before publication. `viat publish plan --json` describes dirty leaves, not a reservation. Review every warning; do not copy blanket acknowledgements from test-host setup.
-4. With publish approval, `viat publish apply --require-tests --yes --json` adds the local script suite, then applies remote gates. It does not automatically run endpoint fixtures; accepted pending/failed build results can still exit 0. Inspect build/env and actual authorized public routes.
-5. Enable live triggers deliberately, one class at a time; verify identity, inputs, order/retry/idempotency expectations and downstream observations. A provider-accepted send is not a receipt.
+Do not invent standalone watch/queue/WS/IM CLIs — repo/API is what exists.
+Keep live trigger definitions at `enabled: false` until target resources,
+DLQ/ack timeouts, watch roots and provider identities are verified; a
+protected scanned account does not mean a copied trigger can be enabled
+elsewhere safely.
 
-Publish response/API fields and gate differences are fully specified in [snapshots](snapshots.md). A read-only project state call is not evidence that endpoint callers have correct permissions. If import/push fails, compare actual destination rows before retrying. If traffic is wrong, unpublish or [rollback](rollback.md) with approval, noting rollback cannot restore overwritten resources/data/live modules or recall trigger effects. Retrying a package import/publish is not exactly-once orchestration; duplicate external effects need business keys.
+## Test, publish, recover
 
-For cleanup pause live schedules/disable watches/queues/WS/IM, account for in-flight tasks/connections/unacked broker deliveries, revoke invitations/test credentials, unpublish disposable endpoints, then delete isolated project/config/data only with approval. Deleting a package/local directory does not clean a remote environment. Retain audit/revision evidence and remove only your synthetic local bundle/staging artifacts; do not prune production to make a demo checkout match.
+1. Review the imported state/diff; provision target resources/secrets, refresh
+   schemas, then run explicitly reviewed DB/authz migrations with supported
+   commands. Migrations are separate from import/push — back up first and
+   confirm rollback compatibility.
+2. With authorized local DB/toolchain access, run the fake suite/endpoint
+   fixtures; the server gate touches real resources, so isolate them first.
+   Both acknowledgements being true inside a fixture does not prove the gate
+   passed.
+3. Explicitly select the **target** project before publishing;
+   `viat publish plan --json` explains the dirty leaves and reserves nothing;
+   read warnings one by one and do not copy the test-host's blanket
+   exemptions.
+4. After approval, `viat publish apply --require-tests --yes --json` runs the
+   local script suite first, then the server gate; endpoint fixtures do not
+   run automatically; "accepted pending/failed build" can still exit 0 —
+   inspect env and the actually authorized routes.
+5. Enable live triggers category by category; verify
+   identity/input/order/retry/idempotency and downstream observability — a
+   provider accepting a send is not a receipt.
 
-Evidence: `crates/viat-cli/src/commands/sync.rs` and export/import implementation, `repo/{resources,endpoints,schedules,watches,queue_triggers,ws_triggers,im}.rs`; `crates/viat-api/src/handlers/{publish,snapshots}.rs`. This task did not validate a real cross-instance migration or provider reconnect; those remain deployment acceptance work.
+Full publish fields and gate differences: [snapshots](snapshots.md). Being
+able to read a project does not prove endpoint permissions end up right. On
+import/push failure, compare the target's real rows before retrying; on bad
+traffic, unpublish or [roll back](rollback.md) with approval — neither
+**restores** overwritten resources/data/live modules or undoes effects a
+trigger already produced. Retrying packages/publishes is not exactly-once
+orchestration; deduplicate external actions with business keys.
+
+## Cleanup
+
+Pause schedules, disable watch/queue/WS/IM, and drain in-flight
+tasks/connections/broker-unacked work; revoke invitations and test
+credentials, unpublish one-off endpoints; then delete isolated projects/
+config/data with authorization. Deleting local packages/directories cleans
+nothing remote; keep audit and revision evidence; delete only your own
+example packages/staging — never prune production for demo consistency.
+
+## Verification basis
+
+Contract source `03751a67`: `crates/viat-cli/src/commands/sync.rs` and the
+export/import implementation,
+`repo/{resources,endpoints,schedules,watches,queue_triggers,ws_triggers,im}.rs`;
+`crates/viat-api/src/handlers/{publish,snapshots}.rs`. Real cross-instance
+migration and provider reconnection were not verified in this task and remain
+deployment acceptance work.

@@ -175,10 +175,16 @@ localhost URL 只是隔离夹具假设，不表示那里已有运行中服务。
 
 清理不能撤回通知、恢复业务库写入或取消已经运行的任务。MCP 没有通用事务、取消、撤销删除或“撤销全部”工具。项目回滚恢复服务修订，**不恢复实时 `uses:` 模块**或外部副作用。执行、审计记录按保留策略继续存在，不要为表面整洁删除它们。
 
-## 维护依据与已知差异
+## 已知差异提示
+
+> [!NOTE]
+> 权限口径以各工具页为准:端点/树/脚本/工作流等**读取**类工具实际要求
+> 项目 Editor,不是"任意成员可读"。`read_script` 遇到跨文件夹同名时返回
+> 409 并要求提供 `folder`,不会枚举候选——需要列举时改用 `list_scripts`。
+
+## 核验依据
 
 - 清单及输入：`contracts/1.1.0/mcp-tools.json`；实际注册和结果包装：`crates/viat-mcp/src/tools/service.rs`。模式是机械字段依据，不是各页语义来源。
 - 配置、HTTP、错误：`crates/viat-mcp/src/config.rs`、`http.rs`、`error.rs`、`lib.rs`；CLI 凭据键比较：`crates/viat-cli/src/config.rs`。本文明确说明 MCP/CLI token 键差异，不声称支持刷新。
 - 工具行为及集成回归案例：`crates/viat-mcp/src/tools/*.rs`、`crates/viat-mcp/tests/it/`。角色门槛检查了 API 的 endpoints、trees、scripts、workflows、schedules、alerts、queue triggers、files、logs、async runs、audit、resources、projects、publishing handlers。
-- 现有源码文字把读取工具泛称为只读或成员可用，但实际端点及树读取 handler 需要 Editor。read_script 模式描述说歧义会列出文件夹，但实际 409 只要求 folder，不枚举候选；应使用 list_scripts。
 - 示例、时间戳、合成 ID、本地提供方 stub 和预期形状均**未通过执行验证**。本参考不宣称完成端到端提供方投递、网络就绪、可执行示例验证或发布批准。

@@ -176,4 +176,8 @@ docker exec "$PG_CONTAINER" psql -U postgres -d cms_example -v ON_ERROR_STOP=1 \
 
 ## 相关契约与依据
 
-[仓库同步](../projects/repo-sync.md)、[授权](../auth/authorization.md)、[HTTP](../triggers/http.md)、[CRUD 替代方案](../triggers/crud.md)、[PostgreSQL](../assets/resources/postgresql.md)。本设计未用 CRUD，因此必须保留显式脚本检查。定向核对实现：`crates/viat-cli/src/repo/{viat_yaml.rs,endpoints.rs}`、`crates/viat-api/src/{lib.rs,handlers/endpoints.rs}`、`crates/viat-runtime/src/{python.rs,annotations.rs}`。源码核对不是在线验收。
+[仓库同步](../projects/repo-sync.md)、[授权](../auth/authorization.md)、[HTTP](../triggers/http.md)、[CRUD 替代方案](../triggers/crud.md)、[PostgreSQL](../assets/resources/postgresql.md)。本设计未用 CRUD，因此必须保留显式脚本检查。
+
+## 核验依据
+
+定向核对实现：`crates/viat-cli/src/repo/{viat_yaml.rs,endpoints.rs}`、`crates/viat-api/src/{lib.rs,handlers/endpoints.rs}`、`crates/viat-runtime/src/{python.rs,annotations.rs}`。源码核对不是在线验收。

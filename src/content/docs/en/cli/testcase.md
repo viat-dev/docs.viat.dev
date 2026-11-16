@@ -270,7 +270,7 @@ viat testcase update 00000000-0000-4000-8000-000000000001 --expected '{"ok":true
 
 **Failure handling, verification and cleanup.** Invalid JSON/match/no flags fails; preserve previous expected/args so a mistaken change does not weaken the gate. Verify show; restore those values with update to undo.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

@@ -5,6 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { readPages, pageUrl, resolveMarkdownLink, pairErrors, rawMarkdown, privacyErrors } from '../scripts/lib/content.mjs';
 import { inspectMarkdown, escapeGeneratedHtml } from '../scripts/lib/markdown.mjs';
+import { convertTabsForBook, tabSyntaxErrors } from '../scripts/lib/tabs.mjs';
+import { remarkViatTabs } from '../scripts/lib/tabs-remark.mjs';
+import { remarkHideVerificationBasis, stripVerificationBasis } from '../scripts/lib/hide-basis.mjs';
 import { coverageReport, linkErrors, contractSectionErrors, releaseErrors, fixtureErrors, handbookDigest } from '../scripts/lib/validation.mjs';
 
 function page(locale = 'en', overrides = {}) {
@@ -170,4 +173,58 @@ test('content loader refuses symlinks and non-Markdown public assets', async () 
     await symlink(path.join(dir, 'guide.md'), path.join(dir, 'linked.md'));
     await assert.rejects(readPages(root), /symlinks are not publishable/);
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('tabs markers convert to labelled sections for offline readers', () => {
+  const source = ['intro', '', ':::tabs id=ways', '', '::tab 控制台', '', 'click **New**', '', '::tab CLI', '', '```sh', 'viat project create demo', '```', '', ':::', '', '> [!NOTE]', '> Screenshots use local fixtures.', ''].join('\n');
+  const converted = convertTabsForBook(source);
+  assert.ok(!converted.includes(':::tabs'));
+  assert.ok(converted.includes('**控制台**'));
+  assert.ok(converted.includes('**CLI**'));
+  assert.ok(converted.includes('click **New**'));
+  assert.ok(converted.includes('viat project create demo'));
+  assert.ok(converted.includes('> **Note:**'));
+  assert.deepEqual(tabSyntaxErrors(source), []);
+  assert.deepEqual(tabSyntaxErrors('```sh\n::tab fenced\n```\n'), []);
+  assert.ok(tabSyntaxErrors(':::tabs\n::tab only\n').length > 0);
+  assert.ok(tabSyntaxErrors('::tab stray\n').length > 0);
+  assert.ok(tabSyntaxErrors(':::tabs\n::tab a\n\ntext\n').length > 0);
+  assert.ok(tabSyntaxErrors([':::tabs', '', '::tab a', 'adjacent', '', ':::'].join('\n')).length > 0);
+});
+
+test('remark plugin renders tab containers with accessible roles', async () => {
+  const { createMarkdownProcessor } = await import('@astrojs/markdown-remark');
+  const processor = await createMarkdownProcessor({ syntaxHighlight: false, remarkPlugins: [remarkViatTabs] });
+  const source = [':::tabs id=ways', '', '::tab Console', '', 'Open **New**.', '', '::tab CLI', '', '```sh', 'viat --version', '```', '', ':::', ''].join('\n');
+  const rendered = await processor.render(source, {});
+  assert.ok(rendered.code.includes('role="tablist"'));
+  assert.ok(rendered.code.includes('data-vtabs-group="ways"'));
+  assert.ok(rendered.code.includes('aria-selected="true"'));
+  assert.ok(rendered.code.includes('role="tabpanel"'));
+  assert.ok(rendered.code.includes('viat --version'));
+});
+
+test('screenshot asset links resolve against the shipped asset set', async () => {
+  const shot = page('en', { content: '![Console](/screenshots/en/console.png)\n![Diagram](/diagrams/concepts.svg)\n![Missing](/screenshots/en/absent.png)\n' });
+  const pages = [shot, page('zh-cn')];
+  const inspections = new Map(await Promise.all(pages.map(async (p) => [p.relative, await inspectMarkdown(p)])));
+  const errors = linkErrors(pages, inspections, new Set(['/screenshots/en/console.png', '/diagrams/concepts.svg']));
+  assert.equal(errors.length, 1);
+  assert.match(errors.join('\n'), /static asset not found/);
+});
+
+test('verification-basis appendix is hidden from rendered outputs only', async () => {
+  const source = ['## Guide', '', 'body', '', '## Verification basis', '', 'Contract source abc123.', '', '## Next section', '', 'stays' ].join('\n');
+  const { createMarkdownProcessor } = await import('@astrojs/markdown-remark');
+  const keep = await createMarkdownProcessor({ syntaxHighlight: false });
+  const drop = await createMarkdownProcessor({ syntaxHighlight: false, remarkPlugins: [remarkHideVerificationBasis] });
+  assert.ok((await keep.render(source, {})).code.includes('Contract source'));
+  const rendered = (await drop.render(source, {})).code;
+  assert.ok(!rendered.includes('Verification basis'));
+  assert.ok(!rendered.includes('Contract source'));
+  assert.ok(rendered.includes('stays'));
+  const stripped = stripVerificationBasis(source);
+  assert.ok(!stripped.includes('Contract source'));
+  assert.ok(stripped.includes('stays'));
+  assert.equal(stripVerificationBasis('```text\n## Verification basis\n```\nkeep'), '```text\n## Verification basis\n```\nkeep');
 });

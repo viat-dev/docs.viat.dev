@@ -1,37 +1,64 @@
 ---
-title: Viat product handbook
-description: Start with installation and a working endpoint, then consult Viat configuration, resources, scripts, workflows, triggers and operational references.
+title: Viat handbook
+description: Start with installation and your first endpoint, then read configuration, resources, scripts, workflows, triggers and operations references.
 doc_id: handbook.index
 verified_release: '1.1.0'
 channel: stable
 ---
 
-Viat organizes resource connections, scripts and workflows into callable interfaces and triggered tasks. This handbook serves operators, project developers, and automation using CLI/MCP. Prerequisites, permissions and failure boundaries are as important as the happy-path steps.
+# Viat handbook
 
-## Start with a verifiable outcome
+Viat turns **resource connections, scripts and workflows** into callable HTTP
+endpoints and triggerable scheduled jobs: write a function in the console or
+CLI, bind a route, publish once — and it is a live API with authentication,
+logs and versioning.
+
+![Project list in the console](/screenshots/en/projects.png)
+
+The screenshot above comes from a local demo instance: after signing in you
+land on the project list, and entering a project gives you its scripts,
+endpoints and publications. To go from install to a working endpoint in about
+ten minutes, start with the first path below.
+
+## Choose a path by goal
 
 | Your goal | Reading path |
 | --- | --- |
-| Decide whether Viat fits a task | [Platform positioning](overview/platform.md) → [Concepts and objects](overview/concepts.md) → [Capabilities and limits](overview/capabilities.md) |
-| Set up an instance | [Docker Compose installation](installation/docker-compose.md) → [Activation prerequisites](instance/activation.md) → [Platform users](instance/platform-users.md) |
-| Create a callable interface | [Projects and collaboration](projects/create-and-collaborate.md) → [Your first endpoint](getting-started/first-endpoint.md) |
-| Use a bare binary or build from source | [Binary and source deployment](installation/binary-source.md) |
-| Use the phone or Mac client | [Client installation and compatibility](installation/clients.md) |
+| Publish a first HTTP endpoint fast | [Docker Compose install](installation/docker-compose.md) → [Activate the instance](instance/activation.md) → [First endpoint](getting-started/first-endpoint.md) |
+| Decide whether Viat fits the task | [Platform positioning](overview/platform.md) → [Core concepts](overview/concepts.md) → [Capabilities and limits](overview/capabilities.md) |
+| Connect databases, APIs or models from scripts | [Resources overview](assets/resources/index.md) → [Scripts](assets/scripts/python.md) → [Workflows](assets/workflows/overview.md) |
+| Run tasks on schedules or events | [Schedules](triggers/schedules.md) → [HTTP triggers](triggers/http.md) → [Queue triggers](triggers/queues.md) |
+| Use the mobile or Mac client | [Client installation](installation/clients.md) |
+| Automate everything by CLI or MCP | [CLI overview](cli/overview.md) → [MCP overview](mcp/overview.md) |
 
-Configuration, assets, triggers, CLI, MCP, operations and applications appear by subject in the sidebar. Unfinished material is not disguised as usable reference through empty placeholder pages; complete coverage remains a publication gate during reconstruction.
+Configuration, assets, triggers, operations and worked applications appear in
+the sidebar by topic. Unfinished content is never disguised as a usable
+reference by empty placeholder pages; full coverage remains a release gate
+during reconstruction.
 
-## Establish version and scope first
+## Three concepts to settle first
 
-This edition uses **Server/CLI 1.1.0** as its baseline; native client versions are independent. Main, development branches and published images need not have identical capabilities. Preview features are labeled separately: unreleased encrypted APNs widget snapshots, for example, are not a 1.1.0 installation prerequisite.
+1. **Platform accounts and project roles are different things.** Platform
+   accounts sign in to the console and CLI; per-project
+   `owner`/`admin`/`developer` roles decide which projects you may edit and
+   publish. See [core concepts](overview/concepts.md).
+2. **Editing a draft is not publishing.** External callers always hit the
+   **published snapshot**; changes go live only after you publish again.
+3. **Server and client versions are independent.** This handbook pins
+   server/CLI **1.1.0**; the native client is versioned separately. Preview
+   features are marked as such — unreleased capabilities are never stated as
+   installation prerequisites.
 
-Platform accounts manage Viat; project end users, API keys and authorizers govern calls to business interfaces. Creating an account, joining a project and granting business permissions are separate steps, not substitutes for one another.
+> [!NOTE]
+> For LLMs and automation tools: start from [`llms.txt`](/llms.txt); every
+> page carries a **Raw Markdown** link, so you never need to parse site HTML.
+> Confirm the instance, project and identity before acting; never guess
+> commands or blindly accept publish warnings.
 
-## For LLMs and automation
+## This site and the offline book
 
-Enter through [`llms.txt`](/llms.txt), then read the relevant versioned pages, parameter tables and complete examples. Each page's **Raw Markdown** link avoids HTML extraction. Structured contracts preserve actual commands, input schemas and provenance; they do not replace runtime behavior or authorization documentation.
-
-Do not guess commands or blindly acknowledge publication warnings. Confirm the instance, project and identity, inspect existing state, then test, change and publish. Enable real external messages, model calls and device actions explicitly. Cleanup must affect only example objects you created.
-
-## Online and offline documentation
-
-Chinese and English pages share document IDs, contracts and example sources. The same content is also exported as a release-pinned offline book, preserving `/_docs/` for intranet deployments. The latest online page must not redefine an older deployment's behavior; use the matching edition and its verified limitations when they differ.
+The Chinese and English pages here share document IDs, contracts and example
+sources. The same content is exported as a version-pinned offline book that
+keeps the `/_docs/` deployment path for intranets. The newest online page
+never overrides what an older deployment actually does; on any difference,
+trust the reference and verified limits of your deployed version.

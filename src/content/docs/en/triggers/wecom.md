@@ -9,22 +9,47 @@ contract_ids: []
 
 # WeCom intelligent bots
 
-Use the bot's **API mode / long connection** credentials (`app_id` is bot id, `app_secret` is its secret), not an incoming group-webhook URL or an ordinary enterprise app callback configuration. Outbound WSS defaults to `wss://openws.work.weixin.qq.com`; the deployment needs egress and the bot enabled in the provider console. Direct messages and group messages that @-mention the bot are supported; require_mention cannot narrow messages that already arrived because of mention.
+Wire the bot using its **API mode / long-connection** credentials
+(`app_id` is the bot id, `app_secret` its secret) — not an incoming
+group-webhook URL and not an ordinary enterprise-app callback configuration.
+The outbound WSS defaults to `wss://openws.work.weixin.qq.com`: the
+deployment needs that egress and the bot must be enabled in the provider
+console. Direct messages and @-mention group messages are supported;
+`require_mention` cannot narrow messages that only arrived because of the
+mention.
 
-One live connection is allowed per bot. Viat coordinates its instances by lease, but an unrelated SDK using the same credentials can still kick it; stop that second client rather than continuously reconnecting both. The connector pings every 30 seconds, considers two missed acknowledgements broken, and distinguishes a provider takeover from a transient network failure.
+Four key facts about connections and replies:
 
-**Return the reply from the triggered script. `viat.im_send` is not supported for WeCom.** Replies are connection frames tied to the inbound req_id, not generic chat_id sends. The platform starts a placeholder stream around 1.5 seconds while a long script runs to meet the provider's first-reply deadline; this does not shorten the script's own timeout or mean a result is ready. It is not an out-of-band alert channel or an unlimited proactive messaging API. A return value cannot recover a connection already lost.
+- **One live connection is allowed per bot.** Viat coordinates its own
+  instances by lease, but an unrelated SDK using the same credentials can
+  still kick it — stop that second client instead of letting both reconnect
+  endlessly.
+- The connector pings every 30 seconds, treats two missed acknowledgements
+  as broken, and distinguishes a provider takeover from a transient network
+  failure.
+- **Replies come from the triggered script's return value; `viat.im_send`
+  is not supported for WeCom.** A reply is a connection frame tied to the
+  inbound req_id, not a generic chat_id send.
+- While a long script runs, the platform starts a placeholder stream at
+  about 1.5 seconds to meet the provider's first-reply deadline — it neither
+  means the result is ready nor shortens the script timeout. This is not an
+  arbitrary proactive alert channel, and a return value cannot recover a
+  connection already lost.
 
-## Creation and responses
+## Create and respond
 
-Read the [complete shared fields, update/clear semantics, permissions and identity contract](chat-accounts.md) first. Create script `chat/reply` before the trigger:
+Read the [full shared contract for fields, updates/clearing, permissions and
+identity](chat-accounts.md) first. Create the script `chat/reply` before the
+trigger:
 
 ```python
 def main(message):
     return "received: " + message["text"]
 ```
 
-These source-derived examples are **unexecuted**; credentials are placeholders, no provider was contacted. Keep both objects disabled until permissions and the target are reviewed.
+Everything below is a **source-derived, unexecuted** example with placeholder
+credentials; no provider was accessed. Keep it disabled until permissions and
+targets are reviewed.
 
 ```http
 POST /projects/demo/im/accounts
@@ -42,12 +67,41 @@ Content-Type: application/json
 {"name":"assistant","platform":"wecom","enabled":false,"account":"assistant","chat_type":"any","require_mention":false,"target":{"kind":"script","name":"chat/reply"},"inputs":{},"params":{},"params_strict":false,"max_concurrent_runs":4,"identity_mode":"off"}
 ```
 
-Account response projection: `{"name":"assistant","platform":"wecom","enabled":false,"resource":null,"has_inline_credentials":true,"meta":{},"groups":[],"peer_identity":null,"status":"ok","status_message":null}`, plus id/created_at/updated_at. It never returns credentials. Trigger response uses `account_id:"<uuid>"`, `target_kind:"script"`, `target_name:"chat/reply"` instead of the submitted account/target objects, plus the full shared fields and ids/timestamps. Save returned ids and read list/health before enabling; an ok status is not a live-service test.
+Account response projection:
+`{"name":"assistant","platform":"wecom","enabled":false,"resource":null,"has_inline_credentials":true,"meta":{},"groups":[],"peer_identity":null,"status":"ok","status_message":null}`
+(plus id/created_at/updated_at; credentials never return). The trigger
+response substitutes `account_id:"<uuid>"`, `target_kind:"script"`,
+`target_name:"chat/reply"` for the submitted account/target objects, plus
+the shared full fields and id/timestamps. Save the id and read the
+list/health before enabling — **status ok is not a passed online test**.
 
-## Verification, recovery and cleanup
+## Verify, recover, clean up
 
-For an opted-in isolated provider account, enable by PUT while preserving all fields, send one synthetic message, compare normalized text/sender identity, reply and ledger/execution logs, then test a rejected identity. Multiple triggers can match; replies may therefore duplicate unless routing is deliberate. Target timeout and external effects follow the [shared delivery contract](chat-accounts.md); no automatic exactly-once/replay guarantee. If health is degraded check egress, provider app visibility, credentials and competing connections. needs_reauth requires corrected credentials, not repeated message sends. Disable trigger/account, account for in-flight work, revoke test invitations/identity bindings, then delete isolated objects. Provider-side app/credential revocation is separate.
+- Verify: enable via a PUT keeping every field, only against an explicitly
+  authorized isolated provider account; send one synthetic message and check
+  normalized text/sender, the reply, ledger and execution logs, then verify
+  identity refusals. Multiple triggers can match at once — bad routing
+  **replies repeatedly**.
+- Delivery semantics follow the [shared delivery contract](chat-accounts.md):
+  no automatic exactly-once or replay guarantee.
+- Failures: for `degraded` check egress, visibility scope, credentials and
+  competing connections (external SDK takeovers included); for
+  `needs_reauth` update the correct credentials — **do not keep sending
+  messages**.
+- Cleanup: disable trigger/account and drain in-flight work → revoke test
+  invites/identity bindings → delete the isolated objects; provider
+  app/credential revocation is handled separately.
 
-Console: Triggers → Chat, Accounts/Populations/Triggers. API: `/projects/<slug>/im/accounts`, `/im/triggers`, account `/health` and `/messages`. Repo: `im/accounts/assistant.yaml`, `im/triggers/assistant.yaml`, `viat pull/push --only chat`; inline accounts are not exported or mirror-deleted. There is no standalone `wecom` CLI command or MCP connector tool.
+Entry points: console **Triggers → Chat** (Accounts/Populations/Triggers);
+APIs `/projects/<slug>/im/accounts`, `/im/triggers` plus per-account
+`/health`, `/messages`; repo `im/accounts/assistant.yaml`,
+`im/triggers/assistant.yaml`, `viat pull/push --only chat` (inline accounts
+are neither exported nor deleted by mirroring). There is no standalone
+`wecom` CLI or MCP connector tool.
 
-Evidence: `crates/viat-api/src/im/connector/wecom.rs`, `im/dispatch.rs`, `handlers/im.rs`; `crates/viat-core/src/types/im.rs`; `crates/viat-cli/src/repo/im.rs`. Provider provisioning/permissions and actual delivery were not exercised for this page.
+## Verification basis
+
+Contract source `03751a67`: `crates/viat-api/src/im/connector/wecom.rs`,
+`im/dispatch.rs`, `handlers/im.rs`; `crates/viat-core/src/types/im.rs`;
+`crates/viat-cli/src/repo/im.rs`. No provider configuration, permissions or
+real delivery were executed for this page.

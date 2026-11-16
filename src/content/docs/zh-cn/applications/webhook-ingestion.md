@@ -177,4 +177,8 @@ unset CASE_API_KEY EVENT_SIGNATURE EVENT_TIMESTAMP
 
 ## 契约依据与未验证边界
 
-参见 [repo-sync](../projects/repo-sync.md)、[HTTP](../triggers/http.md)、[脚本上下文](../assets/scripts/context.md)、[端点认证](../auth/endpoints.md)、SQLite/crypto 参考。定点源码依据：`crates/viat-runtime/src/python.rs` 的 `_Sql`、`_Tx`、crypto verify，`crates/viat-api/src/runner/broker.rs` 的 SQLite 事务，`crates/viat-cli/src/repo/{resources,endpoints}.rs`。读源码不等于在线验证；真实供应商签名兼容、密钥轮换、broker/并发、网络与发布还需独立获授权的集成检查，单元验证不作这些承诺。
+参见 [repo-sync](../projects/repo-sync.md)、[HTTP](../triggers/http.md)、[脚本上下文](../assets/scripts/context.md)、[端点认证](../auth/endpoints.md)、SQLite/crypto 参考。读源码不等于在线验证；真实供应商签名兼容、密钥轮换、broker/并发、网络与发布还需独立获授权的集成检查，单元验证不作这些承诺。
+
+## 核验依据
+
+定点源码依据：`crates/viat-runtime/src/python.rs` 的 `_Sql`、`_Tx`、crypto verify，`crates/viat-api/src/runner/broker.rs` 的 SQLite 事务，`crates/viat-cli/src/repo/{resources,endpoints}.rs`。

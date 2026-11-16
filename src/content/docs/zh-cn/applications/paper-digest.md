@@ -120,6 +120,10 @@ viat resource delete pd_settings
 
 ## 契约与待验证事项
 
-参考[仓库同步](../projects/repo-sync.md)、[HTTP 资源](../assets/resources/http_api.md)、[SQLite](../assets/resources/sqlite.md)、[工作流](../assets/workflows/overview.md)、[计划](../triggers/schedules.md)、[端点认证](../auth/endpoints.md)。维护证据：固定版本产品的 `crates/viat-cli/src/repo/{resources,endpoints,schedules}.rs`、`crates/viat-runtime/src/python.rs`、`crates/viat-api/src/lib.rs` 注册路由。
+参考[仓库同步](../projects/repo-sync.md)、[HTTP 资源](../assets/resources/http_api.md)、[SQLite](../assets/resources/sqlite.md)、[工作流](../assets/workflows/overview.md)、[计划](../triggers/schedules.md)、[端点认证](../auth/endpoints.md)。
+
+## 核验依据
+
+维护证据：固定版本产品的 `crates/viat-cli/src/repo/{resources,endpoints,schedules}.rs`、`crates/viat-runtime/src/python.rs`、`crates/viat-api/src/lib.rs` 注册路由。
 
 仍需人工验证：服务端路径与出站策略、资源解析、RSS 编码/大小、并发 worker 下 SQL 代理行为、所选模型 JSON/费用/隐私、调度准入与时间、发布后的认证拒绝、下游幂等与送达。离线夹具不证明这些集成能力。

@@ -207,4 +207,8 @@ docker exec "$PG_CONTAINER" psql -U postgres -d lab_jobs_example -v ON_ERROR_STO
 
 ## 参考与依据
 
-[仓库同步](../projects/repo-sync.md)、[授权](../auth/authorization.md)、[HTTP](../triggers/http.md)、[定时器](../triggers/schedules.md)、[工作流](../assets/workflows/overview.md)、[PostgreSQL](../assets/resources/postgresql.md)、[HTTP 资源](../assets/resources/http_api.md)。定向核对 `crates/viat-cli/src/repo/{viat_yaml.rs,endpoints.rs,schedules.rs}`、`crates/viat-api/src/{lib.rs,handlers/endpoints.rs}`、`crates/viat-runtime/src/{python.rs,annotations.rs}`。离线逻辑、集成/数据库、调度器、真实供应商是不同验收层。离线单元校验已通过；实际适配器/工作流/回调/供应商集成仍未验证，参见[验证状态](../reference/validation.md)。
+[仓库同步](../projects/repo-sync.md)、[授权](../auth/authorization.md)、[HTTP](../triggers/http.md)、[定时器](../triggers/schedules.md)、[工作流](../assets/workflows/overview.md)、[PostgreSQL](../assets/resources/postgresql.md)、[HTTP 资源](../assets/resources/http_api.md)。离线逻辑、集成/数据库、调度器、真实供应商是不同验收层。离线单元校验已通过；实际适配器/工作流/回调/供应商集成仍未验证，参见[验证状态](../reference/validation.md)。
+
+## 核验依据
+
+定向核对 `crates/viat-cli/src/repo/{viat_yaml.rs,endpoints.rs,schedules.rs}`、`crates/viat-api/src/{lib.rs,handlers/endpoints.rs}`、`crates/viat-runtime/src/{python.rs,annotations.rs}`。

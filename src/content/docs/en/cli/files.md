@@ -161,7 +161,7 @@ viat files rm demo_storage 00000000-0000-4000-8000-000000000001 --reason 'remove
 
 **Failure handling, verification and cleanup.** Bad UUID/missing file/reason/backend failure can fail. Verify list excludes it; retain source/backups before deletion. Re-upload is a new file identity and does not undelete old row/restore grants automatically.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

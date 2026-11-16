@@ -166,7 +166,7 @@ viat tree update demo_tree --name demo_tree_renamed
 
 **失败处理、验证与清理。** 名称/路径冲突拒绝；保存旧值并 update 恢复。tree show 与 endpoint list 核查；线上快照变更需相应发布操作。
 
-## 实现核对依据
+## 核验依据
 
 语法来自固定 Clap 合同与 main.rs；行为/权限核对以下源文件，路径相对产品仓库根。
 

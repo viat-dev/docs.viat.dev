@@ -12,7 +12,14 @@
     "export:book": "node scripts/export-mdbook.mjs",
     "validate:examples": "python3 -I -B examples/hello-endpoint/validate.py && node scripts/validate-applications.mjs",
     "build:book": "npm run export:book && mdbook build exports/mdbook && node scripts/export-examples.mjs --book && node scripts/check-book.mjs",
-    "collect:cli": "node scripts/collect-cli-examples.mjs"
+    "collect:cli": "node scripts/collect-cli-examples.mjs",
+    "generate:references": "node scripts/generate-cli-reference.mjs && node scripts/generate-mcp-reference.mjs && node scripts/generate-resource-reference.mjs",
+    "dev:enable": "node scripts/dev/enable-instance.mjs",
+    "dev:browsers": "playwright install chromium",
+    "dev:capture": "node scripts/dev/capture-screenshots.mjs",
+    "dev:debug-tabs": "node scripts/dev/debug-tabs.mjs",
+    "dev:clean": "node -e \"const{rmSync}=require('node:fs');for(const f of ['scratch-probe.md','scripts/dev/issue-test-license.mjs']){try{rmSync(f)}catch{}}console.log('cleaned')\"",
+    "dev:shot": "node scripts/dev/shot-page.mjs"
   },
   "engines": {
     "node": ">=22.23.4"
@@ -23,5 +30,8 @@
     "astro": "7.4.7",
     "gray-matter": "4.0.3",
     "unist-util-visit": "5.0.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.0"
   }
 }

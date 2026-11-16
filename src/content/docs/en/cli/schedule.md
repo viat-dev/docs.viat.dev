@@ -265,7 +265,7 @@ viat schedule update demo_tick --every-secs 3600 --script demo_echo --disabled
 
 **Failure handling, verification and cleanup.** Invalid trigger, missing target, nonobject inputs or target absence fails. Unlike content editing, these API mutations require only membership in this version. Verify schedule show; pause/delete demo_tick when done. For update preserve the entire previous trigger/target/inputs/enabled state before replacement.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

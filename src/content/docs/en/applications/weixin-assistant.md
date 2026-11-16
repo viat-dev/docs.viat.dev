@@ -153,6 +153,10 @@ Deleting config does not unbind/revoke the provider credential or erase sent mes
 
 ## Evidence and remaining manual requirements
 
-Pinned product evidence: `crates/viat-cli/src/repo/{im,endpoints}.rs`, `crates/viat-api/src/im/{dispatch,connector/weixin}.rs`, `handlers/{im,im_identities}.rs`, registered routes in `crates/viat-api/src/lib.rs` and Python principal/resource projection. [Repo sync](../projects/repo-sync.md) owns mirror semantics.
+[Repo sync](../projects/repo-sync.md) owns mirror semantics.
 
 Still required: real eligible provider account, current binding policy/consent, approved hosts, actual QR/poll confirmation, project-user login/binding, verified sender mapping, fresh context permit, real private routing/reply observation and a manual revoked-token reauth exercise if authorized. Offline fixtures deliberately make no provider/group/permanent-auth integration claims.
+
+## Verification basis
+
+Pinned product evidence: `crates/viat-cli/src/repo/{im,endpoints}.rs`, `crates/viat-api/src/im/{dispatch,connector/weixin}.rs`, `handlers/{im,im_identities}.rs`, registered routes in `crates/viat-api/src/lib.rs` and Python principal/resource projection.

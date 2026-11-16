@@ -9,27 +9,54 @@ contract_ids: ["cli.publish.rollback", "cli.publish.history", "cli.publish.show"
 
 # Rollback and unpublish
 
-Rollback restores **routing pointers to existing immutable snapshots**. It is not a source-control checkout, database rollback, provider-message recall, trigger rollback or restore of users/resources/secrets. Publish rights (effective project Owner/Admin) are required for both rollback APIs and endpoint history/unpublish. Project revision history/show only require membership. Do not confuse the two rollback scopes.
+Rollback does exactly one thing: **it points routes back at an existing
+immutable snapshot**. It is not a source checkout, not a database rollback,
+not message recall, and it restores no users, resources or secrets.
 
-All examples are source-derived/unexecuted. These operations change what callers execute and may warm workers/reload routes. Real rollback, smoke requests and external cleanup require explicit approval.
+Both rollback APIs and endpoint history/unpublish need project Owner/Admin
+publish rights; project revision history/show only need membership. The two
+scopes (single endpoint / whole project) are not interchangeable.
 
-## Choose the correct recovery
+> [!WARNING]
+> A rollback immediately changes what callers execute and may warm workers and
+> reload routes. Real rollbacks, smoke calls and external cleanup need
+    explicit approval. The examples on this page are source-derived and
+    unexecuted.
 
-| Need | Entry point | Exact scope |
+## Pick the right scope first
+
+| Need | Entry point | Exact behavior |
 | --- | --- | --- |
-| Stop new calls to one leaf | `POST /projects/<slug>/endpoints/<id>/unpublish` | Removes active snapshot pointer, keeps history. Protected built-in auth leaves refuse. |
-| Restore that leaf's previous version | `POST …/endpoints/<id>/rollback` | Chooses highest snapshot version **less than the currently active version**; not an arbitrary version/id selector. Requires a suitable prior active/history state. |
-| Undo most recent active publication revision | `POST /projects/<slug>/publish/rollback` | Locks latest not-yet-rolled-back project revision and restores each recorded before pointer. Newly published leaves with before=null become unpublished. |
+| Stop new calls to one leaf | `POST /projects/<slug>/endpoints/<id>/unpublish` | Clears the active pointer and keeps history; built-in auth leaves refuse. |
+| Restore that leaf's previous version | `POST …/endpoints/<id>/rollback` | Selects the **largest snapshot version below the current active version**; arbitrary version/id is not accepted; a usable active/history must exist. |
+| Undo the latest project publication | `POST /projects/<slug>/publish/rollback` | Locks the latest not-yet-rolled-back project revision and restores each entry's before pointer; a first publication has before=null and becomes an unpublish. |
 
-No body, version/id option, warning acknowledgement or test expectation is needed by rollback. Null/omitted body is not “choose latest arbitrary historical release”; the route determines selection. There is no native `publish rollback <revision-id>` or forward promotion-by-snapshot API. `viat publish show <id-or-prefix>` only reads.
+Rollback takes no body, version, id, warning acknowledgement or test
+expectation. An omitted or null body does not mean "any historical release" —
+the route decides. There is no `publish rollback <revision-id>` and no
+forward promote-by-snapshot API; `viat publish show <id-or-prefix>` is
+read-only.
 
-## Inspect before changing traffic
+## Read before touching traffic
 
-`GET /projects/<slug>/publish/history?limit=20&offset=0` returns `project_slug,total,limit,offset,revisions`. Limit clamps 1–100, offset >=0. Each revision has `id,created_at,created_by_email,endpoint_count,rolled_back_at,rolled_back_by_email,summary`. `GET …/publish/revisions/<uuid-or-prefix>` returns `id,project_slug,created_at,created_by_email,rolled_back_at,rolled_back_by_email,endpoints,warnings?`; warnings is omitted when none. Each endpoint contains `node_id,method,path,before_snapshot_id,before_snapshot_version,after_snapshot_id,after_snapshot_version,target_kind,target_name`. Prefix must uniquely identify one project revision, otherwise 400; unknown is 404.
+`GET /projects/<slug>/publish/history?limit=20&offset=0` returns
+`project_slug/total/limit/offset/revisions` (limit clamped to 1–100, offset
+≥ 0). A revision carries
+`id,created_at,created_by_email,endpoint_count,rolled_back_at,rolled_back_by_email,summary`.
 
-For one endpoint `GET …/endpoints/<id>/history` returns an array of complete [SnapshotView](snapshots.md#per-endpoint-publication-and-full-snapshot-response), not source blobs. Compare active id/path/method and target versions before running rollback. A plan/history response is not a traffic lock; coordinate operators and stop concurrent publish/edit automation.
+`GET …/publish/revisions/<uuid-or-prefix>` returns
+`id,project_slug,created_at,created_by_email,rolled_back_at,rolled_back_by_email,endpoints,warnings?`
+(the field is omitted when empty); endpoint entries carry
+`node_id,method,path,before_snapshot_id,before_snapshot_version,after_snapshot_id,after_snapshot_version,target_kind,target_name`.
+A prefix must be unique within the project: ambiguity is 400, unknown is 404.
 
-## Complete project example
+`GET …/endpoints/<id>/history` returns an array of full
+[SnapshotViews](snapshots.md) without source blobs. Compare the active
+id/path/method/target versions before acting; neither history nor plan is a
+traffic lock — coordinate with operators and pause concurrent
+publish/edit automation.
+
+## Whole-project example
 
 ```http
 POST /projects/demo/publish/rollback
@@ -43,23 +70,49 @@ Content-Type: application/json
 {"project_slug":"demo","revision_id":"00000000-0000-4000-8000-000000000010","rolled_back_count":1,"endpoints":[{"id":"00000000-0000-4000-8000-000000000001","method":"GET","path":"/hello","restored_snapshot_id":"00000000-0000-4000-8000-000000000003","restored_snapshot_version":1}]}
 ```
 
-This marks that revision rolled back, refreshes the project registry, purges affected endpoint cache generations and reconciles worker pools. A null restored_snapshot_id/version means unpublished, not deleted. “nothing to roll back” is 400. Repeating a successful project rollback can undo the **next older active revision**, so it is **not idempotent**; on lost response inspect history/current pointers before retrying. There is no request Idempotency-Key contract on this management route.
+The server marks the revision rolled back, refreshes the registry, clears the
+affected cache generations and reconciles worker pools. Null `restored_*`
+means unpublished, not deleted; nothing to roll back answers 400.
 
-Single endpoint `POST /projects/demo/endpoints/<id>/rollback {}` returns the SnapshotView directly:
+> [!WARNING]
+> Repeating a successful project rollback keeps undoing **the next-older active
+> revision** — it is **not idempotent**. If you lose the response, read
+> history/current pointers before deciding; never retry blind. Management
+> routes have no Idempotency-Key contract.
+
+The single-endpoint `POST /projects/demo/endpoints/<id>/rollback {}` answers
+with a SnapshotView directly:
 
 ```json
 {"id":"00000000-0000-4000-8000-000000000003","node_id":"00000000-0000-4000-8000-000000000001","version":1,"method":"GET","path_pattern":"/hello","target_kind":"script","script_name":"echo","script_version":1,"workflow_name":null,"workflow_version":null,"proxy_resource_name":null,"created_by":"00000000-0000-4000-8000-000000000004","created_at":"2026-11-06T00:00:00Z"}
 ```
 
-It selects a previous snapshot, not a new snapshot, then reloads routes and invalidates cached answers. It revalidates restored project_users_grant/current_user_grant against current role/capability restrictions; old validity is not sufficient. Project rollback is a separate bulk pointer-restoration path, not a promise to rerun every per-endpoint publish/grant/regression check. Review restored security bindings and current policy explicitly. Rollback does not run the saved-case publication gate.
+It selects an old snapshot instead of creating a new one, then reloads and
+invalidates caches. Restored project_users_grant/current_user_grant are
+re-checked against **current** roles and capabilities — valid back then does
+not mean valid today. Project rollback is a separate bulk pointer-restore
+path: it does **not** run the grant/regression checks of a single-endpoint
+publish, so explicitly re-review restored security bindings and current
+policy afterwards; rollback does not run the saved-case publish gate.
 
-## What recovery cannot promise
+## What cannot be restored
 
-- Draft script/endpoint rows remain drafts; rollback does not rewrite them to historical source. A later apply can republish a still-dirty unwanted draft. Inspect plan and fix the repo/draft deliberately.
-- Ordinary frozen script dependency graphs restore with their snapshot; `(live)` dependency graphs and **workflow step uses (including nested)** are still live. Restoring main source does not restore those modules.
-- Resource credentials/config, authorizer configuration, authorization rules, project users, DB migrations/data, cache-invalidating external changes and trigger settings remain current. A schema-incompatible old script may still fail.
-- In-flight HTTP/async runs keep already accepted payloads; existing WS connections/current message effects are not a transactional global cutover. Rollback/timeout/cancel cannot retract committed writes or sent messages.
-- Project revision history is bounded by configured retention (default 20 revisions); snapshot persistence and project revision retention are different. A deleted endpoint is not automatically recreated by pointing at an old revision. Export of drafts is not a backup of snapshot history or business data.
+- **Drafts stay drafts** — they are not rewritten to historical source; a
+  later apply can republish unwanted dirty drafts. Check plan; fix the
+  repo/drafts.
+- Ordinary frozen dependency graphs restore with the snapshot; graphs with
+  `(live)` references and **workflow step uses (nested included)** stay live —
+  restoring main source does not restore them.
+- Resource credentials/config, authorizers, authorization rules/users,
+  database schema/data and triggers keep their current state; an old script
+  can be incompatible with a new schema.
+- In-flight HTTP/async keeps its accepted payload; existing WS and
+  already-sent message effects are not part of a global transaction switch —
+  rollback/timeout/cancel never undo committed writes or sent messages.
+- Project revision history is retained per configuration (default 20), unlike
+  the durable snapshot store; deleting an endpoint does not auto-revive it
+  from an old revision. A draft export is not a snapshot-history or business
+  data backup.
 
 ## CLI, verification and cleanup
 
@@ -70,8 +123,26 @@ viat publish rollback --yes --json
 viat endpoint rollback 00000000-0000-4000-8000-000000000001
 ```
 
-Commands are alternatives, **not a sequence to execute together**. Normal project rollback prompts unless --yes/--json; declining can exit 0 without doing anything. Endpoint rollback has no revision argument. See [CLI publication](../cli/publish.md) and [CLI endpoint](../cli/endpoint.md) for literal flags.
+These are **alternatives**, not a sequence to run together. Project rollback
+asks for confirmation without `--yes/--json` and a refusal can still exit 0;
+endpoint rollback takes no revision argument. Full flags:
+[CLI publish](../cli/publish.md) and [endpoint](../cli/endpoint.md).
 
-After success verify current pointers/versions, build/env health, an allowed and forbidden caller, expected public path/method and cache freshness on each relevant instance. For a timeout do not automatically retry: an operation may have committed before response loss. If previous snapshot cannot run under today's resources/schema, unpublish the affected leaf to stop new traffic, repair compatible config/code and deliberately republish. Re-enabling triggers or replaying tasks is separate approval. Clean isolated test endpoints via unpublish/delete after drains; preserve recovery/audit evidence and do not delete production snapshots/logs to hide a failed rollout.
+After success verify: pointer/version, build/env, one allowed and one
+rejected caller, public path/method, and cache freshness on every instance.
+Do not auto-retry a timeout — the change may have committed before the
+response was lost. When an old snapshot is incompatible with today's
+resources/schema, unpublish first to stop new traffic, then fix the
+compatible config/code and publish deliberately. Re-enabling triggers or
+replaying jobs needs separate authorization.
 
-Evidence: `crates/viat-api/src/handlers/{publish,snapshots}.rs`; `crates/viat-db/src/{revisions,snapshots}.rs` (before=null and pointer rollback tests); `crates/viat-core/src/types/snapshot.rs`; CLI publish/endpoint implementations. No rollback, build, test or provider action was executed.
+Test-environment cleanup: after draining, unpublish/delete and keep the
+restore/audit evidence; never delete production snapshots/logs to hide a
+failure.
+
+## Verification basis
+
+Contract source `03751a67`: `crates/viat-api/src/handlers/{publish,snapshots}.rs`;
+`crates/viat-db/src/{revisions,snapshots}.rs` (before=null and pointer rollback
+tests); `crates/viat-core/src/types/snapshot.rs`; CLI publish/endpoint
+implementations. No rollback, build, test or provider action was executed.

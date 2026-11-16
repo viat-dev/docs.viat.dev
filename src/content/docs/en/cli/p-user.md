@@ -364,7 +364,7 @@ viat p-user update demo_user --display-name 'Demo Renamed' --meta '{"demo":true}
 
 **Failure handling, verification and cleanup.** Bad JSON/email/phone fails. Phone validation allows common number punctuation and 5–20 digits; email shape is checked. Save previous profile and restore provided fields; verify list/API.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

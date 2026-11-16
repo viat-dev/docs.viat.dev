@@ -8,74 +8,101 @@ channel: stable
 
 # Capabilities and supported surfaces
 
-This is a decision guide for **server/CLI 1.1.0**, not a promise that every surface exposes every server operation. You need an activated instance for protected product routes. Project membership controls visibility; project `developer` can edit content, while project `owner`/`admin` can publish and manage collaborators. Platform administration is a separate permission plane.
+This page helps you pick the right capability and surface on **server/CLI
+1.1.0**. Three premises run through everything:
 
-## Pick a capability by outcome
+- Protected product routes need an activated instance.
+- Project membership controls visibility: project `developer` edits; project
+  `owner`/`admin` publishes and manages collaborators.
+- Platform administration is a separate permission plane, independent of
+  project roles.
 
-| Desired outcome | Capability | What must already exist / important limit |
+The page never promises that every surface exposes every server operation.
+
+## Choose a capability by goal
+
+| Goal | Capability | Prerequisites / key limits |
 | --- | --- | --- |
-| Answer an HTTP request with code | Script endpoint | Script, method/path, published snapshot; edits are drafts until publish |
-| Coordinate several operations | Workflow endpoint or direct workflow run | Valid workflow and referenced targets; steps can cause real external writes |
+| Answer HTTP with code | Script endpoint | Script, method+path, published snapshot; edits are drafts until published |
+| Orchestrate several operations | Workflow endpoint or direct workflow run | Valid workflow with referenced targets; steps can really write upstream |
 | Forward to an upstream HTTP service | Proxy target | Configured upstream resource and route; credentials stay platform-side |
-| Expose application tables as REST | `crud` target | Suitable database resource and CRUD configuration; write scope and authorization need deliberate design |
-| Maintain a bidirectional connection | WebSocket target | Published routes and compatible client; browser clients use the supported ticket flow rather than putting bearer tokens in URLs |
-| Run later or without holding HTTP open | Schedules and async runs | Activated server and suitable budgets; accepting a run is not proof of completion |
-| React to files, queues, chat, or WebSocket feeds | Configured trigger | Source connectivity and explicit trigger configuration; not every resource automatically starts a consumer |
-| Diagnose a request | Execution records, captured output, live log tail | Project visibility and configured log retention/backend |
-| Work from version control | CLI `pull`, `diff`, `push` | A selected project and controlled local checkout; `push` is not a harmless file upload |
-| Expose management to an agent | `viat mcp` | Authenticated CLI context; **46 tools**, not the obsolete six-tool README count |
+| Expose business tables as REST | `crud` target | Suitable database resource and CRUD config; design write scope and authz deliberately |
+| Hold a bidirectional connection | WebSocket target | Published route and compatible client; browsers use the supported ticket flow — never put a bearer token in the URL |
+| Run on a schedule / off the HTTP path | Schedules and async runs | Activated server and suitable budgets; **accepting a job ≠ completing it** |
+| React to files, queues, chat or WS feeds | Configured triggers | Source connection and explicit trigger config; resources do not auto-start consumers |
+| Investigate a request | Run records, captured output, live logs | Project visibility; bounded by log backend and retention |
+| Collaborate via version control | CLI `pull`/`diff`/`push` | Selected project, controlled working copy; `push` is not a harmless upload |
+| Give an agent management powers | `viat mcp` | Authenticated CLI context; **46 tools**, not the six an old README claimed |
 
-For a complete minimal HTTP flow, use [Your first endpoint](../getting-started/first-endpoint.md). For the object/permission boundaries, use [Core concepts](concepts.md).
+Full minimal HTTP flow: [first endpoint](../getting-started/first-endpoint.md);
+object and permission boundaries: [core concepts](concepts.md).
 
 ## Execution languages
 
-The stable `ScriptLanguage` wire values are:
+Stable `ScriptLanguage` protocol values:
 
-| Value | Role and prerequisite |
+| Value | Purpose and prerequisites |
 | --- | --- |
-| `python` | Python function executed with `uv`-managed runtime; interpreter/dependency availability matters |
-| `typescript` | TypeScript executed with `bun`; npm dependencies must build successfully |
-| `sql` | Platform-executed SQL against a declared database resource |
-| `shell` | Fresh shell process; the published image includes Bash and `jq` |
-| `graphql` | GraphQL operation against the corresponding resource |
-| `viat_gql` | Platform GraphQL layer over a supported database resource |
-| `llm` | Prompt-style target using a configured model resource; provider access can incur charges |
-| `rust` | Compiled worker program; compilation requires the build toolchain/SDK or an externally supplied artifact |
-| `binary` | Externally built worker-protocol executable with a manifest and uploaded artifact; not an arbitrary executable with no protocol |
+| `python` | Python functions with `uv`-managed environments; interpreter and dependencies must be available |
+| `typescript` | TypeScript executed by `bun`; npm dependencies must build |
+| `sql` | SQL executed by the platform against a declared database resource |
+| `shell` | Fresh shell process per run; release images include Bash and `jq` |
+| `graphql` | GraphQL operations against the matching resource |
+| `viat_gql` | The platform GraphQL layer over supported database resources |
+| `llm` | Prompt target using a configured model resource; provider access can cost money |
+| `rust` | Compiled worker programs; compilation needs the build toolchain and SDK, or externally provided artifacts |
+| `binary` | Externally built programs implementing the worker protocol; manifest and uploaded artifact required — not arbitrary protocol-free executables |
 
-The normal image contains the **CLI** and interpreters but not the Rust compilation toolchain. The `1.1.0-build` image adds the pinned Rust toolchain and SDK. A slim node can run appropriate prepared artifacts; it cannot be treated as a Rust build node simply because `viat` is on its `PATH`.
+Image layering: ordinary images include the **CLI** and interpreters but **no**
+Rust toolchain; `1.1.0-build` adds pinned Rust toolchain and SDK. Slim nodes
+run prepared matching artifacts, but a `viat` on `PATH` does not make a node a
+Rust build node.
 
-A script timeout defaults through script header → project default → deployment default (`30` seconds), then the deployment's ceiling applies. The default synchronous ceiling is `300` seconds; background runs have a separate default ceiling of `1800` seconds. Raising a script header alone cannot bypass the deployment's ceiling.
+Script timeouts take, in order: script header → project default → deployment
+default (`30`s), then clamp to the deployment ceiling. Synchronous calls cap
+at `300`s by default; background runs use a separate `1800`s ceiling.
+**Enlarging the header does not bypass the ceiling.**
 
 ## Resource families
 
-Stable resource kinds include:
+- Data and databases: `postgresql`, `mysql`, `sqlserver`, `sqlite`,
+  `mongodb`, `redis`.
+- Requests and compute: `http_api`, `graphql`, `llm`, `cloud_api`,
+  `library`.
+- Files and messaging: `s3`, `storage`, `amqp`, `smtp`, `imap`, `push`.
+- Configuration and security: `config`, `secret`, `crypto_key`.
 
-- Databases/data: `postgresql`, `mysql`, `sqlserver`, `sqlite`, `mongodb`, `redis`.
-- Requests and computation: `http_api`, `graphql`, `llm`, `cloud_api`, `library`.
-- Files/messages: `s3`, `storage`, `amqp`, `smtp`, `imap`, `push`.
-- Configuration/security: `config`, `secret`, `crypto_key`.
+A resource kind represents a platform capability, not provider API parity —
+SQL Server auth and each cloud API's actions have their own limits. `sqlite`
+is a server-side resource file under the configured root and **never** the
+platform database. The existence of `push` in this baseline does not make the
+unreleased direct APNs encrypted-snapshot delivery available.
 
-A resource kind is a platform capability, not a claim of identical APIs across providers. For example, SQL Server authentication and each cloud API's actions have provider-specific limits. `sqlite` is a server-side resource file under configured roots, never the platform database. A `push` resource in this stable baseline is not evidence that unreleased direct APNs encrypted snapshot delivery is available.
+> [!WARNING]
+> Resources can touch real databases, send mail, publish messages or call
+> paid providers — connection tests and draft runs are not guaranteed
+> side-effect free. Use isolated samples and explicit approval for production
+> integrations; keep real credentials out of examples and never commit
+> resource secrets.
 
-Resources can point at real databases, send mail, publish messages, or invoke paid providers. A connection test or draft execution is not necessarily side-effect-free. Use isolated fixtures and explicit approval before exercising production integrations. Do not place real credentials in examples or commit resource secrets.
+## Which surface to use
 
-## Which interface should you use?
-
-| Surface | Best fit | Boundary |
+| Surface | Good for | Boundary |
 | --- | --- | --- |
-| Browser console at `/ui/` | Full authoring and configuration, project members, publish review | Browser must reach the server; controls depend on membership/role |
-| `viat` CLI | Script/endpoint operations, repo sync, logs, targeted management | Some settings require console/API; local `.viat/config.yaml` contains credentials |
-| Management API | Automation against `/projects/...`, `/users`, `/license`, etc. | Platform session/PAT and operation-specific permissions, not a public project API key |
-| Published API | Your application clients calling `/p/<slug>/...` | Endpoint's published authorizers and gates |
-| Native client 0.1 | Multi-instance sign-in, project status, recent runs/logs and selected operations | Independent artifact/version; not a replacement for every console editor |
-| MCP | Agent access to the CLI-backed management tool catalog | Same server-side permissions; tool availability does not grant rights |
+| `/ui/` browser console | Full authoring and configuration, membership, publish review | Browser must reach the server; controls depend on membership and roles |
+| `viat` CLI | Script/endpoint work, repo sync, logs, selected admin tasks | Some settings are console/API-only; local `.viat/config.yaml` holds credentials |
+| Management API | Automating `/projects/...`, `/users`, `/license`, … | Platform session/PAT with operational permissions — not project API keys |
+| Published API | Application clients calling `/p/<slug>/...` | Follows the endpoint's published authorizers and gates |
+| Native client 0.1 | Multi-instance sign-in, project status, recent runs/logs, some operations | Independent artifacts and versions; not a full console replacement |
+| MCP | Agents using the CLI-backed management tool catalog | Still bounded by server permissions; **having a tool is not having permission** |
 
-See [Clients](../installation/clients.md) for Apple installation and CLI exposure. There is no stable native Windows/Linux release promise here; development code is not a distribution commitment.
+Apple installation and CLI exposure: [clients](../installation/clients.md).
+This page promises no stable native Windows/Linux distribution — development
+code existing is not a shipping commitment.
 
-## Verify availability without running business code
+## Check availability without running business code
 
-After [login and project selection](../getting-started/first-endpoint.md):
+After [sign-in and project selection](../getting-started/first-endpoint.md):
 
 ```sh
 viat --version
@@ -85,18 +112,31 @@ viat resource list --json
 viat endpoint list --json
 ```
 
-`viat --version` reports the local binary; `viat version` adds the authenticated server release if available. The list commands return current project assets, including empty arrays for unused kinds. They do not publish endpoints or execute business targets. Consult `viat <command> --help` for actual local flags: `script create` takes `--name --language --file`, while `resource create` takes **`--file`**, not guessed inline `--kind`/`--name` flags.
+`viat --version` reports the local binary; `viat version` additionally reads
+the authenticated server version. The list commands return the current
+project's assets (empty arrays when unused) and never publish or execute
+anything. Verify flags with `viat <command> --help` — e.g. `script create`
+takes `--name --language --file`, and `resource create` takes **`--file`**
+with no inline `--kind`/`--name` arguments; do not guess.
 
 ## Failure handling and non-goals
 
-- **An operation is absent from a client:** use the console/API if supported there; do not invent a CLI command.
-- **Build output says failure after publication:** publication defaults do not block on every build failure. Fix the environment, rebuild, and verify the endpoint before calling the deployment healthy.
-- **A trigger does not fire:** verify activation, source configuration, connectivity, enabled state, and target permissions. Creating a resource alone does not configure a trigger.
-- **Widget data is stale:** check its original update timestamp and network reachability. OS scheduling is not a real-time SLA; no unreleased APNs snapshot setup is required or promised here.
-- **Logs are missing after retention:** logs are not a permanent audit backup. Review retention before relying on historical data.
+| Symptom | Action |
+| --- | --- |
+| A client lacks an operation | Use the console/API surface that supports it; never invent CLI commands |
+| Build failures after publishing | Default publishing is not blocked per build failure; fix the environment, rebuild and verify the endpoint before judging deployment health |
+| A trigger never fires | Check activation, source config, connectivity, enabled state and target permissions; creating a resource alone configures no trigger |
+| Stale widget | Check the original update time and connectivity; OS scheduling has no real-time SLA; this baseline has no unreleased APNs snapshot config |
+| Logs gone past retention | Logs are not a permanent audit backup; confirm retention before relying on history |
 
-For cleanup, delete only assets you deliberately created, stop/disable their triggers first, and revoke external credentials through the system that issued them. Deleting a Viat resource is not a promise to delete upstream business data or revoke a provider's credential.
+When cleaning up, delete only assets you deliberately created: disable the
+involved triggers first, then revoke external credentials through their
+issuing systems — **deleting a Viat resource deletes no upstream business
+data and revokes no provider credentials**.
 
 ## Verification basis
 
-Contract source `03751a67`: `crates/viat-core/src/types/{script,resource}.rs`, `crates/viat-cli/src/main.rs`, `docs/mcp.md`, `docs/scripting.md`, `Dockerfile`, and `client/README.md`. Server/CLI artifact baseline `fd340879`; native client version remains independent.
+Contract source `03751a67`: `crates/viat-core/src/types/{script,resource}.rs`,
+`crates/viat-cli/src/main.rs`, `docs/mcp.md`, `docs/scripting.md`,
+`Dockerfile`, `client/README.md`. Server/CLI artifact baseline `fd340879`;
+the native client is versioned independently.

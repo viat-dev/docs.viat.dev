@@ -8,35 +8,53 @@ channel: stable
 
 # Verification status and reproducible checks
 
-This handbook is a **local reconstruction candidate**, not an announced production documentation release. Coverage, a successful build, unit assertions, actual server integration and external-provider acceptance are different evidence. The checks below describe the current candidate; changing source, contracts or examples requires rerunning the relevant checks.
+This handbook remains a **local reconstruction candidate** — not an
+announced production documentation release. Coverage, a passing build,
+unit assertions, real server integration and external-provider
+acceptance are **different tiers of evidence**. The checks below
+describe the current candidate; changing source, contracts or examples
+requires rerunning the relevant checks.
 
-## What has been exercised
+## Checks already executed
 
-| Layer | Evidence | What it does not prove |
+| Tier | Evidence | Does not prove |
 | --- | --- | --- |
-| Bilingual structure | Both locales cover the required topic/contract inventory; paired metadata, source links/anchors, JSON fences and marked shared snippets are checked. | Semantic completeness of every sentence or provider policy. |
-| Website/offline output | Astro static build, raw Markdown, LLM indexes, public-path/privacy-pattern checks, mdBook and local links/assets under `/_docs/` and `/viat/_docs/`. Example sources are allowlisted in both outputs. | Browser interactions on every device, production hosting/DNS or manual privacy review. |
-| CLI syntax | Actual Clap parser accepted 385 distinct collected/explicit token fixtures, including reviewed redirections. No CLI commands are dispatched by this check. | Actual shell redirection, files, credentials, remote effects or every inline command fragment. |
-| Workflow grammar | All six application workflow definitions passed the actual runtime `parse` and `validate` functions. | Named asset resolution, scheduling or successful workflow execution. |
-| MCP wire contract | Real stdio tests passed: initialize, all 46 tools, JSON text-block success and `isError` failure envelopes. | Every handbook request/expected value or every tool's provider effects. |
-| First endpoint | Real built CLI → isolated PostgreSQL/API → Python draft and published HTTP execution → logs → unpublish/delete. | Customer activation, MFA/SSO or external resources. |
-| CMS | Real CLI push, policy engine, separate temporary business PostgreSQL/login and Python worker. Anonymous, reader, other-author and forged-field failures; editor publication; draft/public isolation; duplicate conflict; owned cleanup. | Tenant isolation, production recovery/load or arbitrary SQL security. |
-| Eight application unit suites | Executed actual deployable functions/shared modules with explicit fake contexts and local temporary data. All eight validators passed without network/process calls. | Real broker, scheduler, provider or device behavior. |
+| Bilingual structure | Both languages cover the required topic/contract inventory; paired metadata, source links/anchors, JSON blocks and marked shared snippets are checked | Per-sentence semantic completeness or provider policy |
+| Online/offline artifacts | Astro static build, raw Markdown, LLM indexes, public-path/privacy-pattern scans, mdBook, plus local links/assets under `/_docs/` and `/viat/_docs/`; both artifacts carry the allowlisted example sources | Browser interaction on every device, production hosting/DNS or a manual privacy review |
+| CLI syntax | The real Clap parser accepts 385 deduplicated collected/explicit token fixtures including reviewed redirections; **commands are never dispatched** | Shell redirection, real files/credentials, remote side effects or every inline command fragment |
+| Workflow syntax | Six application workflow definitions pass the real runtime's `parse` and `validate` | Named-asset resolution, scheduling or actual run success |
+| MCP transport protocol | Real stdio tests cover initialization, the 46-tool inventory, JSON text success and the `isError` failure envelope | Every manual request/expected value or each tool's provider side effects |
+| First endpoint | A really built CLI → isolated PostgreSQL/API → Python draft and published HTTP execution → logs → unpublish/delete | Customer activation, MFA/SSO or external resources |
+| CMS | Real CLI push, the authorization engine, a separate temporary business PostgreSQL/login role and Python worker; covering anonymous, reader, other-author and forged-field rejection, editor publishing, draft/public isolation, duplicate conflicts and own-object cleanup | Tenant isolation, production recovery/load or arbitrary raw-SQL safety |
+| Eight application unit suites | Executing the real deploy functions/shared modules with explicit fake contexts and local temporary data; all eight validators pass with **no network/subprocess calls** | Real brokers, schedulers, providers or device behavior |
 
-Application-unit boundaries:
+Application unit-check boundaries:
 
-- **Paper digest:** feed parsing, citation checks, gated actions and local claim-state behavior; no paid model, live feed or real delivery.
-- **Home Assistant:** identity/action/entity allowlists and opt-in behavior; no actual home-device action or Home Assistant state confirmation.
-- **Weixin assistant:** direct-chat handler and binding/sender checks with synthetic input; no QR login, connector polling, provider reply or reauthentication performed.
-- **CMS:** pure policy callback logic also has the separate real-stack acceptance above.
-- **Lab jobs:** state transitions, duplicates/out-of-order handling and dry-run traps; actual synthetic adapter/workflow/callback integration remains separate.
-- **Webhook ingestion:** exact-byte signatures through a test substitute, SQLite ledger/projection atomicity and duplicate cases; actual HTTP/raw-body/crypto-broker admission not established by that unit test.
-- **Data sync:** local cursor/upsert/checkpoint/rollback behavior; not a distributed transaction with remote systems.
-- **Reports:** SQL/window/claim behavior and fake-relay assertions; no actual SMTP submission or delivery.
+- **Paper digest**: feed parsing, citation checks, action toggles and
+  local claim state; no paid models, live feeds or real delivery.
+- **Home Assistant**: identity, actions, entity allowlists and explicit
+  enablement; no real home devices touched and no actual Home Assistant
+  state confirmed.
+- **WeChat assistant**: direct-chat handler, binding and sender checks
+  under synthetic input; no QR login, connector polling, real replies or
+  reauthentication executed.
+- **CMS**: beyond the pure policy-callback logic, the real-stack
+  acceptance in the table above.
+- **Lab jobs**: state transitions, duplicate/interleaved handling and
+  dry-run traps; real local adapter/workflow/callback integration needs
+  separate verification.
+- **Webhook ingestion**: exact byte signatures, SQLite ledger/projection
+  atomicity and duplicate handling under test doubles; **does not**
+  prove real HTTP/raw-body/crypto-broker admission.
+- **Data sync**: local cursor/upsert/checkpoint/rollback — not a
+  distributed transaction across external systems.
+- **Reports**: SQL, windows, claims and fake-relay assertions; no real
+  SMTP submission or delivery.
 
-## Reproduce local checks
+## Reproducing the local checks
 
-From an authorized documentation checkout with its documented Node/Python prerequisites:
+In an authorized documentation checkout, with the specified Node/Python
+prerequisites:
 
 ```sh
 npm ci
@@ -46,25 +64,47 @@ npm run build:book
 npm run collect:cli
 ```
 
-`validate:examples` blocks accidental network/process calls in the application-unit harness. That guard is not a sandbox for hostile code. Separate `acceptance.py` or adapter programs require their explicit opt-in flags, isolated prerequisites and deliberate operator action; the default command never starts them.
-
-The CLI collector writes token arrays and a report under `exports/`. Review unresolved shell cases; do not count an omitted command as passed. Supply the arrays to the product's developer-only exporter:
+- `validate:examples`' application unit host intercepts unexpected
+  network/subprocess calls — but it is **not** a malicious-code sandbox.
+  Standalone `acceptance.py` or adapter programs require their own
+  explicit enablement flags, isolated prerequisites and an operator
+  decision; the default commands start **none** of them.
+- The CLI collector writes token arrays and a report into `exports/`;
+  review unresolved shell cases — a missing command **never counts** as
+  passing. Hand the arrays to the product's developer exporter:
 
 ```sh
 scripts/export-doc-contracts.sh --output /tmp/handbook-contracts \
   --examples "$DOCS_CHECKOUT/exports/cli-examples.json"
 ```
 
-Run that command in the product checkout with its compile/test database configured. It parses arguments without dispatching any command or loading an operator's CLI config.
+  That command runs inside the product checkout with a configured
+  compile/test database; it parses arguments only, dispatches no
+  commands and reads no operator CLI configuration.
+- The product's default-ignored cross-repository acceptance tests
+  require explicitly provided `DOC_EXAMPLE_ROOT`, `DOC_EXAMPLE_CLI`, a
+  built matching CLI, uv/Python and a dedicated test PostgreSQL
+  administrator; the tests use test-license state and need no vendor
+  signing material. CMS creates an additionally randomized business
+  database/login role, registers ownership and cleans only those
+  objects. With acceptance explicitly requested, missing prerequisites
+  **fail** rather than silently passing.
 
-The product's ignored cross-repository acceptance tests require explicit `DOC_EXAMPLE_ROOT` and `DOC_EXAMPLE_CLI`, a built matching CLI, uv/Python, and a dedicated test PostgreSQL administrator. They use test license state rather than vendor signing material. CMS additionally creates a random isolated business database/login, records ownership and cleans only those objects. Missing prerequisites fail an explicitly requested acceptance test; they are not silently turned into success.
+## Still required before formal release
 
-## Still required before publication
+- Complete the semantic/security review and fix confirmed issues —
+  parser green **never masks** known limits.
+- Verify remaining broker/provider/device integrations only on approved
+  isolated infrastructure; no default message sending, model costs,
+  device operations or real-data cleanup.
+- Verify browser search/language switching, complete offline product
+  sync, and old-path compatibility of the chosen release artifacts.
+- Pin documentation/product to clean reviewed commits and record
+  matching evidence and digests; dirty exports remain candidates.
+- Repository publication, hosting, Cloudflare/DNS changes and
+  production go-live need explicit approval.
 
-- Finish semantic/security review and address confirmed findings; retain limitations rather than hiding them behind a green parser result.
-- Validate remaining real broker/provider/device integrations only with approved isolated infrastructure. Do not send messages, incur model charges, control devices or perform real cleanup by default.
-- Verify browser search/language switching, full offline-product synchronization and legacy paths against the chosen release artifact.
-- Fix the documentation/product source to clean reviewed commits and record matching evidence/digests. Dirty contract exports remain candidates.
-- Obtain explicit approval for repository publication, hosting, Cloudflare/DNS changes and production rollout.
-
-`publication_ready` remains false until the release gates are satisfied. A successful local preview or complete inventory does not authorize flipping it, and `npm run check:release` is expected to reject an incomplete acceptance record.
+Until the release gate passes, `publication_ready` stays false: a
+successful preview or a complete checklist **authorizes no** flag
+change, and `npm run check:release` must reject incomplete acceptance
+records.

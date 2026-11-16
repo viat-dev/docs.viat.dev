@@ -1,6 +1,6 @@
 ---
 title: Publish your first endpoint
-description: Complete a runnable path from an existing deployment and platform login to a Python script, public endpoint, publish, HTTP call, logs, and cleanup.
+description: Starting from a running deployment and a platform login, complete a Python script, a public endpoint, publishing, an HTTP call, logs and cleanup.
 doc_id: getting-started.first-endpoint
 verified_release: '1.1.0'
 channel: stable
@@ -8,23 +8,44 @@ channel: stable
 
 # Publish your first endpoint
 
-This tutorial creates an isolated `hello-lab` project, uploads one Python function, publishes `POST /hello`, calls it without credentials, and reads its execution logs. It uses **real CLI 1.1.0 syntax** and a harmless greeting; no external resource, paid provider, production database, or production execution is needed.
+At the end of this tutorial you own a live endpoint that anyone can call:
 
-The endpoint is deliberately **anonymous**. Do not put private data or real business operations behind it. Run this only on a deployment you are authorized to change, ideally the loopback-only [Compose installation](../installation/docker-compose.md).
+- a dedicated project `hello-lab` containing the Python script `hello`;
+- a published `POST /hello` that needs no credentials to call;
+- one execution log you can see in the console's runs page.
+
+Everything uses **real CLI 1.1.0 syntax** and needs no external resources,
+paid providers or production databases. The endpoint tree screenshot below is
+what the console shows when you are done.
+
+![Endpoint tree with the published POST /hello](/screenshots/en/endpoints.png)
+
+The endpoint is deliberately **anonymous**: anyone who can reach the instance
+can call it — keep private data out. Work only on a deployment you may modify,
+ideally a loopback-only [Compose install](../installation/docker-compose.md).
 
 ## Prerequisites
 
-- An existing, running **server 1.1.0** instance and matching **CLI 1.1.0** on your workstation. The CLI does not install or start the server.
-- Its base URL and a platform email/password. The instance must be activated; if it is not, a platform Owner/Admin follows [Activation](../instance/activation.md).
-- `uv`/Python support on the **server**. The official image already supplies it. The workstation only needs the CLI, Bash, a text editor, and `curl` for this tutorial.
-- Permission to create an isolated project. Its creator becomes project Owner; otherwise an existing project's Owner/Admin must publish for you. Project Developer can edit but cannot publish.
-- An unused project slug `hello-lab` and private local directory `viat-first-endpoint`. If these already exist, choose another slug/directory and replace every occurrence consistently rather than overwriting existing assets.
+- A running **server 1.1.0** instance and the matching **CLI 1.1.0**; the CLI
+  neither installs nor starts a server.
+- The instance base URL plus a platform email and password; the instance must
+  be activated (platform Owner/Admin handles that via
+  [activation](../instance/activation.md)).
+- Server-side `uv`/Python support (the official image bundles it). Your
+  workstation only needs the CLI, Bash, a text editor and `curl`.
+- Permission to create a project (the creator becomes its Owner). Reusing a
+  project is fine, but publishing then needs a project Owner/Admin — a
+  Developer can only edit.
+- An unused project slug `hello-lab` and a local directory
+  `viat-first-endpoint`. If either exists, pick new names and replace them
+  consistently; never overwrite existing assets.
 
-The shell snippets use **Bash**. Run them only against your own authorized non-production instance. The automated acceptance described at the end used an isolated test host, not a customer or production deployment.
+Shell snippets are **Bash**. The automated acceptance at the end of this page
+uses an isolated test host, not a customer deployment.
 
 ## 1. Check the deployment and sign in
 
-For the local Compose installation:
+For a local Compose install:
 
 ```bash
 mkdir viat-first-endpoint
@@ -41,11 +62,19 @@ viat auth whoami
 viat version
 ```
 
-For a remote instance, replace the `VIAT_SERVER` assignment with its real base URL before running. Include any reverse-proxy mount prefix, but not `/ui/` or `/p/hello-lab`. For this local setup, `/healthz` returns `{"status":"ok"}`. Login prints `logged in as <your-email>`; `whoami` prints the same email. Version output should include `viat 1.1.0 (cli)` and the server's `1.1.0` line when available.
+Expect `/healthz` to answer `{"status":"ok"}`; `whoami` prints your email; the
+version output includes `viat 1.1.0 (cli)` and, when available, a server
+`1.1.0` line. For a remote instance set `VIAT_SERVER` to the real base URL —
+including any reverse-proxy mount prefix, but never `/ui/` or `/p/hello-lab`.
 
-Password login requires both `--email` and `--password`; the CLI does not prompt for omitted values. These Bash prompts keep literal passwords out of shell history, but the resulting password argument is briefly visible to local process inspection. Use a trusted workstation. If enrolled in MFA, follow the CLI's code prompt. If enrollment is required, complete it once in the console and retry. Stop on an authentication error instead of continuing with another saved session.
-
-Your `.viat/config.yaml` contains session credentials. Keep it private and out of version control. See [Platform users](../instance/platform-users.md) for configuration lookup and SSO details.
+> [!NOTE]
+> Password sign-in requires both `--email` and `--password`; the CLI does not
+> prompt for missing values. `read -s` keeps the password out of shell
+> history, but the argument is briefly visible to local processes — use a
+> trusted workstation. With MFA enrolled, enter the code when the CLI asks.
+> After login, `.viat/config.yaml` holds session credentials: keep it secret
+> and out of version control; config lookup and SSO are covered in
+> [platform users](../instance/platform-users.md).
 
 ## 2. Create and select the project
 
@@ -55,13 +84,18 @@ viat project select hello-lab
 viat project member ls --json
 ```
 
-Expected output includes `created hello-lab` and `selected hello-lab`; your membership row has `role: "owner"`. Creation is a remote operation, not a local scaffold. The project already has a default endpoint tree and built-in `anonymous` authorizer, which this example explicitly selects later.
+Expect `created hello-lab` and `selected hello-lab`, with your member row at
+`role: "owner"`. This creates remotely — no local scaffold. A new project
+ships with a default endpoint tree and the built-in `anonymous` authorizer
+that step 4 selects explicitly.
 
-If `slug already taken` appears, do not keep using that name unless it is genuinely your disposable project. [Create and collaborate](../projects/create-and-collaborate.md) explains slugs and member roles.
+If you see `slug already taken`, pick another slug unless you are sure the
+project is your own throwaway. Slugs and member roles:
+[creating projects together](../projects/create-and-collaborate.md).
 
 ## 3. Write and upload the script
 
-Create a UTF-8 file named `hello.py` with exactly:
+Create the UTF-8 file `hello.py` with exactly:
 
 ```python fixture=hello-endpoint/hello.py
 def main(name: str = "world") -> dict:
@@ -69,53 +103,62 @@ def main(name: str = "world") -> dict:
     return {"message": f"Hello, {name}!"}
 ```
 
-This is the Python `main(...)` function grammar the runtime executes. It does not accept a fake `ctx` positional parameter. This function needs no resource declaration and no dependency block. The `name` annotation/default describes an optional string input; the dictionary return becomes JSON.
-
-Upload it and inspect the stored draft:
+This is the `main(...)` function signature the runtime executes — no invented
+positional `ctx`, no resource declarations or dependency block needed. The
+annotation and default on `name` describe an optional input; the dict return
+value becomes JSON. Upload and inspect the server-side draft:
 
 ```sh
 viat script create --name hello --language python --file hello.py
 viat script show hello --json
 ```
 
-Expected create output: `created hello (v1)`. The JSON view includes `name`, `language`, source content, version, and inferred schema. `script create` uses `--name`, `--language`, and `--file`; `hello.py` is not an implicit positional source argument.
+Expect `created hello (v1)`; the JSON view shows name, language, source,
+version and the inferred input structure. `script create` takes
+`--name/--language/--file` — `hello.py` is not an implicit positional.
 
-Run the **draft** directly:
+Take the **draft** for a run:
 
 ```sh
 viat script run hello --args '{"name":"Ada"}'
 ```
 
-Expected JSON output:
+Expected output:
 
 ```json
 {"message":"Hello, Ada!"}
 ```
 
-Whitespace/pretty-printing can differ. This run executes the server-side draft but creates no public HTTP route. Draft runs can have real side effects in general; this particular function only returns a greeting and emits a log line.
-
-JSON must remain valid after shell parsing. For a name containing quotation marks, preserve JSON escapes inside single shell quotes:
+Draft runs can have real side effects (this one only prints a log line). The
+argument must be a valid JSON object; for embedded double quotes keep JSON
+escaping under a shell single-quote:
 
 ```sh
 viat script run hello --args '{"name":"Ada \"Lovelace\""}'
 ```
 
-Expected JSON string value is `Hello, Ada "Lovelace"!` (serialized quotes appear as `\"` in JSON). Do not write Python dictionary syntax such as `{'name': 'Ada'}` as the JSON argument.
+Expect the JSON form of `Hello, Ada "Lovelace"!`. Never pass Python dict
+syntax like `{'name': 'Ada'}` as the argument.
 
-## 4. Bind an explicit public endpoint
+![The hello script in the console editor](/screenshots/en/script-editor.png)
+
+The screenshot shows the same script in the console: editor, inferred input
+schema and run history share one page.
+
+## 4. Bind an explicitly public endpoint
 
 ```sh
 viat endpoint create --segment hello --method POST --script hello --authorizers anonymous
 ```
 
-Expected output has two lines:
+Expect two lines:
 
 ```text
 created POST /hello
 id: <server-generated-endpoint-UUID>
 ```
 
-The angle-bracket text describes a dynamic value, not a literal UUID to submit. Copy the actual value after `id:` into the following prompt:
+Angle brackets mark dynamic values. Copy the real `id:` value into:
 
 ```bash
 read -r -p 'Endpoint UUID from create output: ' ENDPOINT_ID
@@ -123,25 +166,41 @@ viat endpoint show "$ENDPOINT_ID" --json
 viat publish plan --json
 ```
 
-Verify method `POST`, path `/hello`, script `hello`, and allowed authorizer `anonymous`. No parent/tree flag is needed for this root-level endpoint in the new project's default tree. No authorization gate is added by this example. An anonymous route is publicly callable by anyone who can reach the instance.
+Check method `POST`, path `/hello`, script `hello`, authorizers `anonymous`.
+Root-level endpoints of a fresh project need no parent/tree arguments; this
+example adds no authz gates.
 
-The full caller URL is **`$VIAT_SERVER/p/hello-lab/hello`**. It is not the management URL `/projects/hello-lab/...`, and it is not `/ui/...`.
+The full call URL is **`$VIAT_SERVER/p/hello-lab/hello`** — not the
+`/projects/hello-lab/...` management URL and not `/ui/...`.
 
-## 5. Publish this endpoint
+## 5. Publish the endpoint
 
 ```sh
 viat endpoint publish "$ENDPOINT_ID"
 ```
 
-For a new endpoint, expect `published POST /hello as v1`, followed by any build result. This deliberately publishes only the selected endpoint, not every unrelated draft in a shared project. `viat publish plan` was a read-only review, not the publication itself.
+Expect `published POST /hello as v1` followed by the build result. This flow
+publishes only the selected endpoint, not every unrelated draft in the
+project; `viat publish plan` is a read-only preview.
 
-If warnings or enabled saved regression tests block publication, read and fix them. Do not automatically add `--acknowledge-warnings` or `--acknowledge-test-failures`. Check dependency-build results too: default `VIAT_PUBLISH_BUILD_BLOCK=0` can allow publishing even if a build fails. Default builds are synchronous; an operator can enable background builds, in which case wait for readiness before expecting the first call to work. `viat script env hello --json` shows recorded environment state, and `viat script build hello --wait` explicitly prepares it.
+> [!WARNING]
+> When warnings or regression cases block publishing, read and fix the cause —
+> do not reflexively add `--acknowledge-warnings` or
+> `--acknowledge-test-failures`. The default `VIAT_PUBLISH_BUILD_BLOCK=0`
+> allows publishing despite a failed build; check `viat script env hello --json`
+> for the build state and use `viat script build hello --wait` to wait
+> explicitly.
 
-Published dispatch reads a **snapshot**, not the live endpoint/script row. Editing `hello.py` alone changes nothing on the server; `script update` changes the draft, and a later publish changes this public route. Ordinary `uses:` imports are frozen at publish; explicitly `(live)` imports are an exception. See [Core concepts](../overview/concepts.md).
+External traffic reads a **snapshot**: editing local `hello.py` alone changes
+nothing server-side; `script update` changes the draft and publishing again
+updates the public route. Dependency freezing rules:
+[core concepts](../overview/concepts.md).
 
 ## 6. Call the published API
 
-No platform token or API key is needed because the route explicitly uses `anonymous`:
+:::tabs id=first-call
+
+::tab curl (anonymous caller)
 
 ```sh
 curl --silent --show-error --include \
@@ -150,13 +209,29 @@ curl --silent --show-error --include \
   --data '{"name":"Ada"}'
 ```
 
-Expected HTTP status: **`200`**. Expected JSON body:
+Expect HTTP status **`200`** with body:
 
 ```json
 {"message":"Hello, Ada!"}
 ```
 
-This endpoint's normal body mode expects a JSON **object**, not a JSON string, array, or Python literal. Without explicit overrides, object fields pass through as function arguments. This function has no required input; the following uses its Python default:
+`curl` needs no project token, which demonstrates the unauthenticated caller
+most directly.
+
+::tab viat call (project token)
+
+```sh
+viat call --method POST /hello --body '{"name":"Ada"}'
+```
+
+Expect the same JSON body. `viat call` uses the selected project's token and
+is handy for debugging; the anonymous route does not need it.
+
+:::
+
+The endpoint requires a JSON **object** body — not a string, array or Python
+literal. Without explicit override rules, object fields pass through as
+function arguments; the empty object `{}` falls back to the Python default:
 
 ```sh
 curl --silent --show-error \
@@ -165,48 +240,53 @@ curl --silent --show-error \
   --data '{}'
 ```
 
-Expected body: `{"message":"Hello, world!"}`. A JSON object can also be supplied through the CLI with `viat call --method POST /hello --body '{"name":"Ada"}'`; `curl` above is preferred here because it demonstrates an unauthenticated application caller without depending on any configured project token.
+Expect `{"message":"Hello, world!"}`.
 
-## 7. Find the execution and its captured output
+## 7. Find the execution and captured output
 
 ```sh
 viat logs query --endpoint "$ENDPOINT_ID" --limit 10 --json
 ```
 
-Expected response is an object with `items` and `next_before`. The recent published calls appear with `method: "POST"`, a successful status, latency, and a `request_id`. If ingestion is not yet visible, wait briefly and query again; do not confuse the earlier draft test with this endpoint-filtered request.
-
-Copy one returned request's `request_id`:
+Expect an object with `items` and `next_before`; your public call appears
+with `method: "POST"`, a success status, timing and a `request_id`. If logs
+have not landed yet, retry shortly; do not confuse step 3's draft run with
+these endpoint-filtered requests.
 
 ```bash
 read -r -p 'Request UUID from logs query: ' REQUEST_ID
 viat logs show "$REQUEST_ID" --json
 ```
 
-Inspect the execution and captured line `hello endpoint invoked`. The exact timestamps, UUIDs, latency, and pagination cursor are generated values; this tutorial does not provide fixed expected IDs. For an interactive live stream, `viat logs tail` subscribes until `Ctrl-C`; start it before another call if you want to watch live events.
+Inspect the execution detail and the captured line `hello endpoint invoked`.
+Timestamps, UUIDs, timing and pagination cursors are dynamic. For live
+observation use `viat logs tail` (subscribe first, then call).
 
-Successful HTTP output and matching server logs together verify the route. A log record alone is insufficient: refused requests are logged too, even when the target never starts. Logs are subject to backend and retention settings.
+![Runs page](/screenshots/en/runs.png)
+
+A successful HTTP response together with matching server logs is what proves
+the route works: logs alone are not enough — rejected requests get logged
+too. Logs obey backend and retention settings.
 
 ## Troubleshooting
 
 | Failure | Check |
 | --- | --- |
-| `not logged in` / no server configured | Repeat login in this private directory; check `VIAT_CONFIG_DIR` or an ancestor's config |
-| `403 license_required` | Platform Admin/Owner must activate; healthy HTTP does not imply activation |
-| Cannot select project | Confirm instance, slug, platform email, and membership |
-| Edit works but publish returns `403` | Project Owner/Admin is required, not just Developer or platform Admin |
-| `404` when calling | Correct `/p/<slug>/...` URL and active publication; a draft is not served |
-| Method refusal | Use `POST`, not a browser address-bar `GET` |
-| `400` with body/input detail | Send a valid JSON object and a string `name`; check quoting and `Content-Type` |
-| Python spawn/dependency error | Check server `uv` availability, environment build state, logs, and container permissions |
-| Calling still returns old code | Upload the changed file with `viat script update hello --file hello.py`, then publish again |
-| `401`/`403` on a supposedly public route | Inspect the published authorizer/gate configuration, not only the draft |
-| No matching log row | Check selected project, exact endpoint UUID, retention/backend delay, and whether the request reached this instance |
-
-The example has no upstream secrets and no external side effects. Do not generalize that safety to scripts using real database, mail, message, or model resources.
+| `not logged in` / no server configured | Sign in again inside this directory; check `VIAT_CONFIG_DIR` or ancestor configs |
+| `403 license_required` | A platform Admin/Owner must activate; HTTP health is not activation |
+| Cannot select project | Verify instance, slug, platform email, membership |
+| Can edit but publish returns `403` | Needs project Owner/Admin — Developer or platform Admin is not enough |
+| Call gets `404` | Check the `/p/<slug>/...` URL and the active publication; drafts do not serve |
+| Method rejected | Use `POST`; a browser address bar sends `GET` |
+| `400` with body details | Send a valid JSON object; `name` is a string; check escaping and `Content-Type` |
+| Python process/dependency errors | Check server `uv`, build state, logs and container permissions |
+| Calls still return old code | `viat script update hello --file hello.py`, then publish again |
+| "Public" route returns `401`/`403` | Check the published authorizers and gates, not just the draft |
+| No matching log | Verify project, endpoint UUID, retention, and that the request reached this instance |
 
 ## 8. Clean up the tutorial
 
-Unpublish before deleting the endpoint and script:
+Unpublish first, then delete the endpoint and the script:
 
 ```sh
 viat endpoint unpublish "$ENDPOINT_ID"
@@ -216,16 +296,25 @@ viat endpoint list --json
 viat script list --json
 ```
 
-The example route should no longer answer successfully; built-in auth endpoints may remain in the list. These commands do not delete the project or its past execution records. Do not invent a `viat project delete` command; this CLI does not have one. Remove any disposable collaborator memberships separately.
-
-When finished, `viat auth logout` clears the resolved **local** CLI session; it does not revoke a stolen server session in this release. Use console session controls for revocation. Remove the local tutorial file/directory only after confirming you do not need it; keep `.viat/` out of commits and shared archives.
-
-## Executed acceptance and remaining boundaries
-
-The shared `hello.py` passed local function assertions and the product's opt-in `handbook_first_endpoint_real_cli` integration test. That test built the CLI, created an isolated PostgreSQL test database and loopback API, then ran login, project creation/selection, script upload/draft execution, endpoint creation/publication, anonymous HTTP and CLI calls, log inspection, unpublish/delete and local logout. It read this handbook's actual source file rather than a copied greeting.
-
-The host used a deliberately active **test license** and a synthetic account. This verifies the endpoint path, not installation, obtaining/activating a real customer code, MFA/SSO, every failure scenario, or an external provider. Those remain separate prerequisites and acceptance tasks.
+The demo route stops answering; the built-in auth endpoints remain listed —
+that is expected. The commands do not delete the project or run history;
+there is no `viat project delete` in this CLI. Finish with `viat auth logout`,
+which clears the **local** CLI session (revoke server sessions from the
+console's session controls); remove the local directory once you are sure,
+and never commit or share `.viat/`.
 
 ## Verification basis
 
-Contract source `03751a67`: Clap definitions in `crates/viat-cli/src/main.rs`; command implementations `commands/{auth,project,script,endpoint,logs}.rs`; Python signature/schema examples in `crates/viat-api/tests/it/script_schema.rs`; JSON body binding in `crates/viat-api/src/handlers/dispatch.rs`; snapshot publication in `handlers/snapshots.rs`. This page targets stable server/CLI artifacts `1.1.0` (`fd340879`).
+Contract source `03751a67`: the Clap definitions in
+`crates/viat-cli/src/main.rs`; `commands/{auth,project,script,endpoint,logs}.rs`;
+`crates/viat-api/tests/it/script_schema.rs`; JSON body binding in
+`handlers/dispatch.rs`; snapshot publishing in `handlers/snapshots.rs`. Target
+stable artifacts `1.1.0` (`fd340879`).
+
+> [!NOTE]
+> This page's `hello.py` is actually executed by the product-side
+> `handbook_first_endpoint_real_cli` integration test against an isolated
+> PostgreSQL test database (login, create, publish, anonymous call, cleanup).
+> The test license and synthetic accounts do not cover installation, real
+> activation-code acquisition, MFA/SSO or external providers — those are
+> separate prerequisites.

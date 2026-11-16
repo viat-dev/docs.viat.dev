@@ -78,6 +78,6 @@ Each section explains verification and cleanup. Keep previous source/config/data
 
 There is no project push, tokens create, push --prune, global --json or retired endpoint --permissions. Use viat push and viat auth token create; --prune belongs to import only. CLI/MCP intentionally do not mirror all console settings/APIs; a schema does not imply a command exists.
 
-## Maintenance evidence
+## Verification basis
 
 Pinned grammar: `contracts/1.1.0/cli.json`; `crates/viat-cli/src/main.rs`. Common client/config: `crates/viat-cli/src/{client,config,pathref}.rs`. Role definitions: `crates/viat-core/src/types/project.rs:5–24`. Group pages list behavioral evidence; source paths are maintenance evidence, not a substitute for the instructions above.

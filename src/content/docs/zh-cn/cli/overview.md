@@ -78,6 +78,6 @@ viat project list --json
 
 没有 project push、tokens create、push --prune、全局 --json、旧 endpoint --permissions。使用 viat push、viat auth token create；只有 import 有 --prune。CLI/MCP 不刻意镜像全部控制台设置或 API，不能从某个 schema 推出存在某个命令。
 
-## 维护证据
+## 核验依据
 
 固定语法：`contracts/1.1.0/cli.json`; `crates/viat-cli/src/main.rs`. 通用客户端/配置：`crates/viat-cli/src/{client,config,pathref}.rs`. 权限定义：`crates/viat-core/src/types/project.rs:5–24`. 行为来源各组列出；源文件路径是维护证据，不替代本参考步骤。

@@ -181,4 +181,8 @@ unset CASE_API_KEY
 
 ## 依据与未验证边界
 
-参见 [repo-sync](../projects/repo-sync.md)、[上下文](../assets/scripts/context.md)、[工作流](../assets/workflows/overview.md)、[HTTP](../triggers/http.md)、[调度](../triggers/schedules.md)、[SQLite](../assets/resources/sqlite.md)、[CLI 同步](../cli/sync.md)。定点依据为 `crates/viat-runtime/src/python.rs` 的事务/query/execute、`crates/viat-api/src/runner/broker.rs` 的 SQLite 锁及 CLI 资源/端点序列化。单元 fixture 不能证明真实 scheduler 身份/lease、broker timeout/rollback、发布或外部系统 CDC/幂等语义，需另行授权集成验证。
+参见 [repo-sync](../projects/repo-sync.md)、[上下文](../assets/scripts/context.md)、[工作流](../assets/workflows/overview.md)、[HTTP](../triggers/http.md)、[调度](../triggers/schedules.md)、[SQLite](../assets/resources/sqlite.md)、[CLI 同步](../cli/sync.md)。单元 fixture 不能证明真实 scheduler 身份/lease、broker timeout/rollback、发布或外部系统 CDC/幂等语义，需另行授权集成验证。
+
+## 核验依据
+
+定点依据为 `crates/viat-runtime/src/python.rs` 的事务/query/execute、`crates/viat-api/src/runner/broker.rs` 的 SQLite 锁及 CLI 资源/端点序列化。

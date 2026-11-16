@@ -168,12 +168,14 @@ resource.push.empty_app_key/empty_master_secret/empty_project_id/empty_service_a
 
 通用删除步骤：先停用调用脚本、代理/CRUD 目标及相关触发器，迁移依赖并保留需要的证据，再用 `viat resource delete demo` 或 DELETE 详情路由。409 `resource_in_use` 时先重新绑定/删除消息指出的端点，不应强行绕过引用。删除配置资产不等于撤销第三方凭据、删除外部数据或回滚已发生副作用。
 
-## 相关资源与维护依据
+## 相关资源
 
 - [HTTP API 资源](http_api.md)
 - [Config 资源](config.md)
 - [Secret 资源](secret.md)
 - [资源总览](index.md)
+
+## 核验依据
 
 固定契约：`contracts/1.1.0/resources.json` → `resource.push`。
 

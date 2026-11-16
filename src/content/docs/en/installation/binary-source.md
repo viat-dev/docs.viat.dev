@@ -8,24 +8,36 @@ channel: stable
 
 # Binaries and source builds
 
-The simplest stable server installation is [Docker Compose](docker-compose.md). A `viat` executable is the **management CLI**, not a combined server installer. The server executable is `viat-api`. This page covers identifying those binaries and building a pinned source checkout when you deliberately maintain a developer-managed installation.
+The simplest stable-server installation is
+[Docker Compose](docker-compose.md). Two program names to keep apart:
+`viat` is the **management CLI**, not a combined server installer; the
+server executable is `viat-api`. This page covers identifying the
+binaries and building a pinned source checkout when you deliberately
+maintain a developer-managed installation.
 
-## Before choosing this path
+## Confirm before choosing
 
-You need permission to install/run software on the host, a PostgreSQL database you control, protected secret storage, and a valid activation code for the verification key in your chosen server build. Building from source does not bypass activation and does not make customer-side signing-key generation an activation procedure.
+- You need: host install/run permissions, a controllable PostgreSQL
+  database, protected secret storage, and a valid activation code
+  **matching** the verifying key compiled into the chosen server build.
+  Source builds **bypass no activation**, and "customers generate signing
+  keys" is not an activation step.
+- Source builds additionally need: the release's Rust toolchain
+  (`rust-toolchain.toml` pins `1.98`), Cargo, a C linker and platform
+  development libraries; Node/npm to build the browser console — using
+  the repository-root lockfile/workspaces, **never** a separate install
+  inside `web/`; `uv` for Python scripts, `bun` for TypeScript and
+  Bash/`jq` for shell capabilities (compiling the server installs
+  **none** of these interpreters); network access for build
+  dependencies and, when needed, runtime package installation.
+- This page promises **no** downloadable native server installer and no
+  signed Windows/Linux desktop distribution. Apple client installation
+  and its bundled CLI: [clients](clients.md); this manual establishes no
+  public artifact download URL.
 
-For a source build, also provide:
+## Identify what you already have
 
-- The release's Rust toolchain (`rust-toolchain.toml` pins `1.98`), Cargo, a C linker and platform development libraries required by its dependencies.
-- Node/npm if you want to build the browser console; use the repository-root lockfile/workspaces, not independent installs inside `web/`.
-- `uv` for Python scripts, `bun` for TypeScript, and Bash/`jq` for the shell capabilities you intend to use. Compiling the server does not install those interpreters.
-- Network access for the build dependencies and, when needed, runtime package installations.
-
-This is not a promise of downloadable native server packages or signed Windows/Linux desktop releases. For Apple client artifact installation and its bundled CLI, see [Clients](clients.md). No public artifact download URL is established by this handbook.
-
-## Identify what you have
-
-For an already installed CLI:
+For an installed CLI:
 
 ```sh
 command -v viat
@@ -33,40 +45,62 @@ viat --version
 viat version
 ```
 
-`viat --version` should report `viat 1.1.0` for this baseline. `viat version` always reports the CLI and adds the server release only when a configured session can read `/version`. “Version unavailable” is not proof that the binary is wrong; it can indicate missing login, network failure, or an older server.
+This baseline's `viat --version` should answer `viat 1.1.0`. `viat
+version` always reports the local CLI and adds the server version only
+when the configured session can read `/version` — "Version unavailable"
+is not necessarily a binary problem; it can be signed-out, network
+failure or an older server.
 
-The official container carries `/usr/local/bin/viat-api` and `/usr/local/bin/viat`. Do not copy a Linux binary out of the image and assume it will execute on macOS or Windows. Its architecture and shared-library requirements still apply.
+The official container ships `/usr/local/bin/viat-api` and
+`/usr/local/bin/viat`. **Never** assume a Linux binary copied out of the
+image runs on macOS/Windows — architecture and shared-library
+requirements still apply.
 
-## Build the stable source deliberately
+## Deliberately build stable source
 
-Use a product checkout obtained through your authorized source distribution. In its root, confirm the server/CLI release commit before compiling:
+Use a product working copy obtained through the authorized source
+distribution channel; before compiling at the root, confirm the
+server/CLI release commit:
 
 ```sh
 git checkout --detach fd340879
 git rev-parse HEAD
 ```
 
-`fd340879` is the server/CLI 1.1.0 release baseline. The later documentation-contract baseline `03751a67` also contains Apple release-entry tooling; it is not a reason to treat every later branch as a new stable server release. Do not check out or ship unreleased Widget/APNs branches under the stable label.
+`fd340879` is the server/CLI 1.1.0 release baseline. The later
+documentation contract baseline `03751a67` additionally contains Apple
+release tooling — which **does not make** every later branch a new
+stable server version; never check out unreleased Widget/APNs branches
+and ship them as stable.
 
 ### Containerized source build
 
-With Docker available, an explicit target avoids accidentally building the final build-capable stage:
+With Docker, specify the target explicitly to avoid accidentally
+building the final compilable variant stage:
 
 ```sh
 docker build --target runtime -t viat-local:1.1.0 .
 ```
 
-Expected outcome: a local image containing server, CLI, console, and reference book. This command builds locally; it does not push an image or install a running service. It requires substantial time, disk, and dependency downloads. The Dockerfile uses the committed SQLx cache for compilation. To deploy this locally built image, adapt the `viat.image` in [Docker Compose](docker-compose.md) to `viat-local:1.1.0` and retain all runtime configuration and storage requirements.
-
-For a Rust-compiling server node, select the other target explicitly:
+- Expect a local image containing the server, CLI, console and reference
+  handbook. The command only builds locally: no push, no running
+  service; it needs significant time/disk/downloads and the Dockerfile
+  compiles with the committed SQLx cache. To deploy, change
+  `viat.image` in [Docker Compose](docker-compose.md) to
+  `viat-local:1.1.0` **keeping every runtime configuration and storage
+  requirement**.
+- When the node must compile Rust scripts, pick the other target
+  explicitly:
 
 ```sh
 docker build --target runtime-build -t viat-local:1.1.0-build .
 ```
 
-The build variant adds the compiler and matching SDK. It does not remove the need for durable artifact storage, database backups, activation, or runtime limits.
+  The build variant adds the compiler and matching SDK — it **removes
+  no** persistent-artifact-storage, database-backup, activation or
+  runtime-limit requirements.
 
-### Native developer build
+### Native development build
 
 From the pinned product root:
 
@@ -76,15 +110,26 @@ npm ci
 npm run build:web
 ```
 
-Expected executables are `target/release/viat-api` and `target/release/viat`; browser files are `web/dist`. `SQLX_OFFLINE=true` uses the checked-in `.sqlx/` descriptions for this unchanged release. It is not a substitute for regenerating the cache when maintaining modified SQL. Ordinary online SQLx compilation instead requires a live, migration-compatible PostgreSQL database at compile time. A cache mismatch is a reason to restore a consistent source/cache pair—not to edit query metadata blindly.
+- Expected artifacts: `target/release/viat-api` and
+  `target/release/viat`; browser output in `web/dist`. For unmodified
+  release sources `SQLX_OFFLINE=true` uses the committed `.sqlx/`
+  descriptions — it **cannot** replace regenerating the cache after
+  modifying SQL. Ordinary online SQLx compilation requires a live,
+  migration-matched PostgreSQL at compile time. On cache mismatch,
+  restore a consistent source/cache combination — **never** blindly edit
+  query metadata.
+- Headless management-API/CLI installs may skip the `npm` steps; without
+  built files and `VIAT_WEB_DIR` the native server ships no console out
+  of thin air. This sequence builds **no** native apps, runs no tests,
+  creates no system service and installs nothing into `PATH`.
 
-The `npm` steps are unnecessary for a headless management API/CLI setup, but without built files and `VIAT_WEB_DIR`, a native server does not magically contain the console. This sequence does not build native apps, run tests, create a system service, or install tools on your `PATH`.
+## Configure the source-built server
 
-## Configure a source-built server
-
-Prepare an empty PostgreSQL database with a dedicated login. For the bootstrap, the login needs privileges to apply the platform's migrations. Do not point an experimental build at an existing production database.
-
-In a **Bash** session at the product root, set values privately:
+- Prepare an **empty** PostgreSQL database and a dedicated login; during
+  bootstrap that role needs permission to apply platform migrations.
+  **Never** point an experimental build at an existing production
+  database.
+- In a **Bash** session at the product root, enter privately:
 
 ```bash
 read -r -s -p 'PostgreSQL URL: ' DATABASE_URL; printf '\n'
@@ -103,15 +148,28 @@ export VIAT_WEB_DIR="$PWD/web/dist"
 ./target/release/viat-api
 ```
 
-Use a PostgreSQL URL such as `postgres://USER:PASSWORD@HOST:5432/DATABASE` with actual values and percent-encoding where necessary. Generate the master key with `openssl rand -hex 32` once, save it securely, and re-use it. Generate a separate strong JWT secret. The native default JWT value `dev-secret-change-me` is not safe for any real deployment. These prompts avoid putting literal passwords in shell history; environment variables and local process access remain a host-security concern.
+- The PostgreSQL URL looks like
+  `postgres://USER:PASSWORD@HOST:5432/DATABASE` with your real values
+  (percent-encoded when needed). Generate the master key once with
+  `openssl rand -hex 32`, store it safely and **reuse** it; generate a
+  separate strong random JWT secret — the native default
+  `dev-secret-change-me` suits no real deployment. These prompts keep
+  passwords out of shell history; environment variables and local
+  process access remain host-security concerns.
+- The server applies migrations at startup; a missing platform database
+  or master key fails the boot. The initial Owner bootstraps exactly
+  once — environment variables **never** overwrite an existing
+  password. Long-running services should switch to protected
+  service-manager credentials/configuration rather than an interactive
+  shell.
+- Skipped console build: omit `VIAT_WEB_DIR` and sign in via CLI/API;
+  when the console is wanted, confirm `web/dist` exists before start.
+  You may privately set `VIAT_LICENSE_CODE` for startup activation or
+  follow [activation](../instance/activation.md) after signing in.
 
-The server applies migrations at startup. If your platform database or master key is missing, startup fails. The initial Owner is seeded only once; environment changes do not overwrite an existing password. For a persistent service, move configuration into protected service-manager credentials/configuration rather than relying on an interactive shell.
+## Verify and troubleshoot
 
-If you skipped the console build, omit `VIAT_WEB_DIR` and use CLI/API login. If you want a console, ensure `web/dist` exists before starting. Set `VIAT_LICENSE_CODE` privately for startup activation, or sign in and follow [Activation](../instance/activation.md).
-
-## Verify and diagnose
-
-From a second terminal:
+In a second terminal:
 
 ```sh
 curl --fail --silent --show-error http://127.0.0.1:8080/healthz
@@ -119,21 +177,33 @@ curl --fail --silent --show-error http://127.0.0.1:8080/readyz
 ./target/release/viat --version
 ```
 
-Expect HTTP `200` from liveness (`{"status":"ok"}`), readiness `200` for a usable database, and CLI `viat 1.1.0`. A healthy process may still be unactivated. Follow [Your first endpoint](../getting-started/first-endpoint.md) for a genuine publish/call verification.
+Expected: liveness `200` (`{"status":"ok"}`), readiness `200` when the
+database is reachable, CLI `viat 1.1.0`. A healthy process **can still
+be unactivated**; real publish/call verification:
+[first endpoint](../getting-started/first-endpoint.md).
 
-| Failure | Remedy |
+| Failure | Action |
 | --- | --- |
-| `DATABASE_URL must be set` | Export a URL for the platform PostgreSQL database, not a resource SQLite file |
-| `VIAT_MASTER_KEY must be set` / invalid hex | Supply the saved 64-hex-character master key |
-| Build cannot find SQLx query data | Use the matching release cache; modified SQL needs a live compile database and cache regeneration |
-| `/ui/` unavailable | Build `web/dist` and set `VIAT_WEB_DIR`, or use headless CLI/API intentionally |
-| Python/TypeScript runtime cannot start | Install the chosen interpreter on the server's `PATH`; a successful Rust build did not install it |
-| Rust script will not compile | Verify matching compiler/SDK/build capability, not merely the existence of the CLI |
+| `DATABASE_URL must be set` | Export the **platform** PostgreSQL URL, not a resource SQLite file |
+| `VIAT_MASTER_KEY must be set` / invalid hex | Supply the stored 64-hex-character master key |
+| Build cannot find SQLx query data | Use the release-matched cache; after SQL changes, compile against a live database and regenerate |
+| `/ui/` unavailable | Build `web/dist` and set `VIAT_WEB_DIR`, or deliberately choose headless CLI/API |
+| Python/TypeScript runtimes won't start | Install the chosen interpreters into the server's `PATH`; a Rust compile success installs no interpreter |
+| Rust scripts won't compile | Check the matching compiler, SDK and build capability — not merely whether the CLI exists |
 
 ## Stop and clean up
 
-Use `Ctrl-C` for an interactive server and wait for shutdown. Keep the database and saved master key if you want to resume. Removing `target/` removes local build products, **not** the platform database or server-created application files. Drop only a deliberately disposable database through your normal database-administration process. Do not use an untested older binary against a migrated database as a rollback plan.
+Stop an interactive service with `Ctrl-C` and let it shut down. To
+recover later, **keep the database and master key**; removing `target/`
+deletes only local build artifacts and **never** the platform database
+or business files the service created. Delete only explicitly
+discardable databases through normal database-management procedures;
+**never** attach unverified old binaries to a migrated database as a
+"rollback".
 
 ## Verification basis
 
-Server release `fd340879`; contract source `03751a67`: `Cargo.toml`, `rust-toolchain.toml`, `Dockerfile`, root `package.json`, `crates/viat-api/src/{config,main}.rs`, and `crates/viat-cli/src/commands/auth.rs`.
+Server release `fd340879`; contract source `03751a67`: `Cargo.toml`,
+`rust-toolchain.toml`, `Dockerfile`, root `package.json`,
+`crates/viat-api/src/{config,main}.rs`,
+`crates/viat-cli/src/commands/auth.rs`.

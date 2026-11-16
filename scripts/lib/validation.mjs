@@ -70,8 +70,12 @@ export function contractSectionErrors(page, inspection, contracts) {
 }
 
 const GENERATED_URLS = new Set(['/llms.txt', '/llms-en.txt', '/llms-zh-cn.txt', '/contracts/manifest.json', '/documentation-index.json']);
+/** Root-relative static assets that ship with the site AND the offline book. */
+export const ASSET_PREFIXES = ['/screenshots/', '/diagrams/'];
 
-export function linkErrors(pages, inspections) {
+/** Root-relative asset files under public/, e.g. the set returned by
+ * check-content's asset scan; image links must resolve offline in the book. */
+export function linkErrors(pages, inspections, assets = new Set()) {
   const errors = [];
   const byPath = new Map(pages.map((p) => [p.relative, p]));
   const byUrl = new Map(pages.map((p) => [pageUrl(p.relative), p]));
@@ -91,6 +95,10 @@ export function linkErrors(pages, inspections) {
       else target = byUrl.get(parsed.pathname);
       if (!target) {
         if (!parsed.hash && GENERATED_URLS.has(parsed.pathname)) continue;
+        if (!parsed.hash && ASSET_PREFIXES.some((prefix) => parsed.pathname.startsWith(prefix))) {
+          if (!assets.has(parsed.pathname)) errors.push(`${label}: static asset not found under public${parsed.pathname}`);
+          continue;
+        }
         errors.push(`${label}: missing local target`);
         continue;
       }

@@ -9,58 +9,119 @@ contract_ids: []
 
 # Chat accounts, routing and identity
 
-This is the shared contract for [WeCom](wecom.md), [WeChat](weixin.md), [Feishu](feishu.md), [Lark](lark.md) and [DingTalk](dingtalk.md). Read it together with the platform page: their transports and send capabilities are not interchangeable. Accounts hold credentials/connections; triggers select messages and bind them to existing **script/workflow** targets. No endpoint targets. Configuration and target drafts are live; no publish step. This subsystem does not add native HomeAssistant, MQTT or Slurm connectors.
+This page is the **shared contract** for the five chat platforms — read it
+together with each platform page: [WeCom](wecom.md), [WeChat](weixin.md),
+[Feishu](feishu.md), [Lark](lark.md), [DingTalk](dingtalk.md). Their
+transports and send capabilities are not interchangeable.
 
-All API examples are source-derived/unexecuted. Real QR scans, chat sends and provider calls require explicit opt-in. Account/trigger CRUD and account QR APIs currently require a **project member**. Minting/revoking self-service links requires content-edit rights; listing links/uses requires membership. Sender identity create/delete requires Owner/Admin/Developer project rights; listing requires membership. These are management credentials, separate from the end-user identities a message can resolve to.
+The model in one sentence: **accounts** hold credentials/connections;
+**triggers** select messages and bind them to existing script/workflow
+targets (no endpoint targets). Configuration and target drafts are live and
+there is **no publish step**. No native HomeAssistant/MQTT/Slurm connectors
+exist here.
 
-## Complete account contract
+Permission layers:
 
-`POST /projects/<slug>/im/accounts` creates; `GET …/im/accounts` lists; `PUT|DELETE …/im/accounts/<name>` updates/deletes. Account fields:
-
-| Field | Create / update |
+| Action | Requires |
 | --- | --- |
-| `name` | Required nonblank string; PUT can rename the account addressed by the old name. |
-| `platform` | Required `wecom|weixin|feishu|lark|dingtalk`; preserve it when editing credentials. |
-| `enabled` | Default true, including PUT; preserve false explicitly when editing a paused account. |
-| `resource` | Name of a credential resource, mutually exclusive with credentials. |
-| `credentials` | Inline JSON, encrypted at rest, never serialized back. Exactly one of resource/credentials is required on creation; WeChat starts with `{}` before QR. On update both omitted/null preserve the current credential source. Supplying one switches source; there is no plaintext secret-read API. |
-| `meta` | Creation default `{}`; update omission/null preserves, `{}` clears metadata. Carried in message.account.meta; provider-specific bot_open_id/robot_code are interpreted by their connector. |
-| `groups` | Default `[]`; update omission/null preserves, `[]` clears. Account populations, not provider chat rooms. |
-| `peer_identity` | Optional platform-side human identity; unique per platform deployment-wide. Omission/null on update preserves, not clears. A duplicate is 409 rather than a silent binding takeover. |
+| Account/trigger CRUD, account QR APIs | Project membership |
+| Create/revoke self-service bind links | Content-edit rights |
+| View links/usage records | Project membership |
+| Create/delete sender identity bindings | Project Owner/Admin/Developer |
+| View identity bindings | Project membership |
 
-Credential JSON for static platforms uses `app_id`, `app_secret`; optional `base_url` is confined by platform host allowlists. Put credentials in the resource's secret portion or the encrypted inline field, not in meta/repo prose. Returned AccountPublic has **all** `id,name,platform,enabled,resource,has_inline_credentials,meta,groups,peer_identity,status,status_message,created_at,updated_at`; resource/peer/status_message can be null. Status is `ok|degraded|needs_reauth`, not proof of message delivery. `GET …/<name>/health` reports connection/lease health, `GET …/<name>/messages` returns recent processing ledger. Default ceilings: 500 accounts/project, 2000 total, 200 served/instance, configurable by operator; reaching a cap is not solved by retrying account creation.
+> [!NOTE]
+> All API examples are source-derived and unexecuted; real QR scans, sends
+> and provider calls need explicit authorization. Administrative
+> credentials and the end-user identity parsed from messages are different
+> things.
 
-## Complete trigger contract
+## The full account contract
 
-`POST /projects/<slug>/im/triggers`; `GET …/im/triggers`; `PUT|DELETE …/im/triggers/<name>`. Create/update use the same full-form fields:
+`POST /projects/<slug>/im/accounts` creates, `GET …/im/accounts` lists,
+`PUT|DELETE …/im/accounts/<name>` updates/deletes.
 
-| Field | Default / conditions |
+| Field | Create/update |
 | --- | --- |
-| `name`, `platform`, `target` | Required name, platform enum above, existing `{kind:script|workflow,name:"folder/name"}`. |
+| `name` | Required, non-blank; a PUT may rename the account named by the old path. |
+| `platform` | Required `wecom\|weixin\|feishu\|lark\|dingtalk`; unchanged when editing credentials. |
+| `enabled` | Default true (PUTs included); editing a paused account must explicitly keep false. |
+| `resource` | Credential resource name; mutually exclusive with credentials. |
+| `credentials` | Inline JSON, encrypted at rest, never echoed. Exactly one of resource/credentials at create (`{}` before a WeChat QR scan); on update, omitting both keeps the current source and sending one switches it. No plaintext-read API exists. |
+| `meta` | `{}` at create; omitted/null keeps on update, `{}` clears; delivered as `message.account.meta`; bot_open_id/robot_code are read by the respective connector. |
+| `groups` | Default `[]`; omitted/null keeps, `[]` clears. This is the account **population**, not provider group chats. |
+| `peer_identity` | Optional platform-side personal identity, unique per platform across the instance; omitted/null keeps on update and never clears; conflicts answer 409 — no silent binding hijacking. |
+
+Static platform credentials use `app_id`/`app_secret` with an optional
+`base_url` constrained by the platform host allowlist; credentials live in
+the resource's secret section or the encrypted inline field — **never in
+meta or repo prose**.
+
+AccountPublic fields:
+`id,name,platform,enabled,resource,has_inline_credentials,meta,groups,peer_identity,status,status_message,created_at,updated_at`
+(resource/peer/status_message nullable). `status` is
+`ok|degraded|needs_reauth` — it **does not prove message delivery**.
+`GET …/<name>/health` reads connections/lease; `GET …/<name>/messages`
+reads the processing ledger. Default caps: 500 per project, 2000 total, 200
+accounts served per instance (operator-configured) — exceeding them is not
+solved by recreating accounts.
+
+## The full trigger contract
+
+`POST /projects/<slug>/im/triggers`, `GET …/im/triggers`,
+`PUT|DELETE …/im/triggers/<name>`; create and update share the full form.
+
+| Field | Default/condition |
+| --- | --- |
+| `name`, `platform`, `target` | Required: name, platform enum, an existing `{kind:script\|workflow,name:"folder/name"}`. |
 | `enabled` | true. |
-| `account` | Omitted/null matches every enabled platform account in this project; a name pins one and must match platform. |
-| `account_groups` | `[]` means no population restriction; nonempty narrows account fan-in by population membership. |
-| `chat_type` | `any`; also `direct`, `group`. A filter cannot create unsupported platform traffic. |
-| `keyword` | Omitted/null matches all; otherwise case-insensitive substring of normalized text. Media-only text may be empty. |
-| `require_mention` | false; meaningful only for Feishu/Lark, since WeCom/DingTalk group arrival already implies mention, and native WeChat group support is not established. |
-| `inputs` | Defaults null; execution merges object constants, otherwise no constants. Prefer explicit `{}`. |
-| `params` | `{}`: argument name → `{from:<dotted path>,required:false,default?:<JSON>}`; paths address the envelope, e.g. message.text/message.raw.priority. Missing/null leaves use default if present; missing required without default fails; missing optional remains absent. No HTTP type-coercion declaration here. |
-| `params_strict` | false: include message as well as declared params. true omits message; constants still merge. Declared values override same-named constants. |
-| `max_concurrent_runs` | 4; connection-time concurrency bound per account, changes apply on reconnect. It is not a global per-trigger ordering guarantee. |
-| `identity_mode` | off; optional or required described below. |
-| `identity_key` | Omitted/null uses message.sender_id; dotted envelope path. |
-| `identity_rule` | Optional template, must contain `{key}`. |
-| `identity_prompt` | Optional unbound reply, must contain `{url}`. Identity fields must be blank/absent when identity_mode is off. |
+| `account` | Omitted/null funnels **all** of the project's enabled accounts on that platform; a name pins one account whose platform must match. |
+| `account_groups` | `[]` imposes no population restriction; non-empty narrows by account population membership. |
+| `chat_type` | Default any; direct/group otherwise; a filter cannot create traffic the platform lacks. |
+| `keyword` | Omitted/null matches everything; otherwise a case-insensitive substring over normalized text (media-only messages may have empty text). |
+| `require_mention` | false; meaningful for Feishu/Lark only; WeCom/DingTalk group messages already arrive only via @; native WeChat group support is unestablished. |
+| `inputs` | Default null; only object constants merge — prefer `{}`. |
+| `params` | Default `{}`; "param → `{from:<dotted-path>,required:false,default?:<JSON>}`" such as `message.text`/`message.raw.priority`. Missing/null leaves use `default` when present; required-without-default fails; optional-missing stays absent. **No HTTP-style type declarations here.** |
+| `params_strict` | false passes message plus declared params; true omits message (constants still merge); declared values override same-named constants. |
+| `max_concurrent_runs` | 4; read at connection establishment, bounded per account, changes apply on reconnect; **not** a global per-trigger ordering guarantee. |
+| `identity_mode` | Default off; also optional/required (below). |
+| `identity_key` | Omitted/null uses `message.sender_id`; a dotted envelope path. |
+| `identity_rule` | Optional template; must contain `{key}`. |
+| `identity_prompt` | Optional unbound reply; must contain `{url}`. With mode off, all identity fields must be blank/omitted. |
 
-PUT is **full replacement** for trigger policy: omitted optional values reset to their defaults; use `[]`, `{}`, null and explicit false as appropriate, not a guessed merge patch. Account update has the special preservation semantics above. A message can match multiple triggers and run each once; fan-in is not first-match-only.
+The trigger PUT is a **full replacement**: omitted optionals revert to
+defaults; clearing is per-field via `[]`/`{}`/null/explicit false — not a
+merge patch (the account update's keep semantics above is the separate
+exception). One message can match several triggers and **runs once per
+trigger** — first-match-wins is not a thing here.
 
-Response TriggerPublic uses `account_id` (nullable UUID), **not** the submitted account name, and `target_kind,target_name`, **not** nested target; other returned fields are `id,name,enabled,platform,account_groups,chat_type,keyword,require_mention,inputs,params,params_strict,max_concurrent_runs,identity_mode,identity_key,identity_rule,identity_prompt,created_at,updated_at`.
+TriggerPublic returns `account_id` (nullable UUID), not the submitted
+account name, and `target_kind,target_name` instead of a nested target; the
+remaining fields are
+`id,name,enabled,platform,account_groups,chat_type,keyword,require_mention,inputs,params,params_strict,max_concurrent_runs,identity_mode,identity_key,identity_rule,identity_prompt,created_at,updated_at`.
 
 ## Input, output and shared identity
 
-Default args are constants plus `message:{platform,account:{id,name,meta},chat_type,chat_id,sender_id,kind,text,mentioned,raw,reply_handle}`. `kind` is text/image/voice/file/video/event; raw/media fields are provider-specific, not automatically downloaded/transcribed in all connectors. `reply_handle` is sensitive routing capability, not a durable universal destination. With identity_mode off, no message.identity is added and run principal is system:im. optional adds a bound project-user object or null; required blocks an unbound sender. Bound runs carry that active user's principal into authorization/resource identity forwarding, without granting permission merely because binding succeeded.
+Default parameters = constants plus `message:{platform,
+account:{id,name,meta},chat_type,chat_id,sender_id,kind,text,mentioned,
+raw,reply_handle}`:
 
-Bindings key `(project,platform,sender_key)` independently of the particular bot account. Lookup existing binding **before** trying identity_rule; a rule renders an existing active project-user identity and persists the binding. `identity_rule:"jwt:corp:{key}"` is only safe when the provider key and IdP subject genuinely align. It does not create a user or prove an arbitrary metadata claim. Manual binding:
+- `kind` is text/image/voice/file/video/event; `raw` and media fields vary
+  by platform — no connector is guaranteed to download or transcribe.
+- `reply_handle` is a sensitive routing capability, **not** a permanent
+  universal target.
+- `identity_mode: off` adds no `message.identity` and runs as system:im;
+  `optional` adds the bound user object or null; `required` blocks unbound
+  senders. After binding, authorization and resource identity forwarding use
+  the **active project user's** principal — the binding itself grants no
+  permissions.
+
+The shared binding key is `(project,platform,sender_key)`, independent of
+any bot account. Flow: look for an existing binding → try the
+`identity_rule`; a template matching an existing active project-user
+identity persists the binding. `identity_rule:"jwt:corp:{key}"` is usable
+only when the provider key truly equals the IdP subject — it creates no
+user and proves no arbitrary meta. Manual binding:
 
 ```http
 POST /projects/demo/im/identities
@@ -69,20 +130,84 @@ Content-Type: application/json
 {"platform":"feishu","sender_key":"synthetic-open-id","user":"alice"}
 ```
 
-Response includes `id,platform,sender_key,project_user_id,identity,display_name,bound_via:"admin",bound_at`. List with optional `?user=alice&platform=feishu`, remove `DELETE …/im/identities/<id>`. Under required mode an unbound direct sender may receive a signed **15-minute** project-login binding link; the page under `/p/<slug>/_chat/bind` requires the project's own credentials and login pre-hook. A group gets a request to DM instead, never a sender binding link exposed to all members. Disabled users are not treated as valid bound users. Account populations, peer_identity, invitation meta and project-user identity bindings are distinct mechanisms; none automatically grants another's trust.
+The answer carries
+`id,platform,sender_key,project_user_id,identity,display_name,bound_via:"admin",bound_at`;
+view with `?user=alice&platform=feishu` and remove via
+`DELETE …/im/identities/<id>`.
 
-Return text/JSON appropriate to the provider to reply; a null output sends no automatic reply. [WeCom](wecom.md) replies over its held connection, the others have their documented sending constraints. A successful script or accepted provider API response is not proof the human read the message.
+Under `required`, an unbound **direct-chat** user receives a signed
+**15-minute** project login link; the `/p/<slug>/_chat/bind` page demands
+project credentials and runs the login pre-hook. Group chats only suggest
+moving to a direct chat — sender bind links are never leaked to the whole
+group. Deactivated users are not valid bindings. Account populations,
+`peer_identity`, invitation meta and project-user identity bindings are
+**four different mechanisms** that never automatically trust each other.
+
+Returning platform-appropriate text/JSON auto-replies; null sends nothing;
+WeCom replies over the connection while other platforms have their own send
+constraints. **A successful script or an accepted provider API call proves
+nothing about a human reading it.**
 
 ## Delivery, health and recovery
 
-One leased instance holds each account connection. Messages claim a dedup ledger before acknowledging/persisting cursor; each matching trigger has its own message identity. This suppresses ordinary redelivery, **not exactly-once external side effects**. Connector acknowledgement may occur after durable claim but before target success, so it is not RabbitMQ's success→ack contract. No generic auto-retry of every failed script or replay API is promised. Stranded old work is retired as failed (one-hour threshold); the ledger is not a complete replay payload archive. Use a business id and separate durable outbox/work table when losing/repeating an action is unacceptable.
+- One lease-holding instance holds each account's connection; the claim
+  dedup ledger is written first, then ack/cursor persistence; each matching
+  trigger has its own message identity. Duplicate delivery is usually
+  suppressed, but **exactly-once external effects are not guaranteed**.
+- Provider acks can land **after the persistent claim but before script
+  success** — unlike RabbitMQ's success→ack order. Script failures are not
+  automatically retried, there is no generic replay API, and stranded old
+  work is marked failed after a one-hour threshold; the ledger is not a
+  full payload replay archive. **Critical business flows need their own
+  durable outbox/work table and business ids.**
+- Transient disconnects back off 2–60 seconds and reset on healthy
+  sessions; revocation/config errors park at `needs_reauth` for human
+  repair — updating credentials clears it, while toggling `enabled` does
+  not.
+- Concurrency is per account with no global strict ordering; script edits
+  apply live while connection-level settings need a reconnect. Timeouts
+  roll back no writes or sent messages; disabling/deleting waits for
+  reconciliation to stop new routing/connections and **does not atomically
+  cancel** in-flight effects.
+- Investigation order: health → ledger → execution logs → fix target/
+  credentials → confirm existing side effects before retrying business.
 
-Transient connection failures back off 2–60 seconds; a healthy session resets delay. Revoked/misconfigured credentials stop in needs_reauth, requiring a human fix. Updating credentials clears that stuck state; toggling enabled alone is not credential repair. Concurrency is per account, no strict global order; edits to scripts are live, and connection-level settings take effect on reconnect. Runtime timeout does not undo resource writes or provider sends. Disabling/removing a trigger/account stops new routing/connections after reconciliation, not atomic cancellation of in-flight side effects. Inspect health, ledger and execution logs, repair credentials/target, then deliberately retry business work after checking prior effects.
+## Self-service invites and the repo lifecycle
 
-## Self-service account invitation and repo lifecycle
+- Native WeChat QR establishes a **bot account**, distinct from
+  sender→project-user binding.
+- Content editors may `POST …/im/bind-links` with
+  `{platform:"weixin",label?,ttl_hours:24,max_uses:50,groups:[],meta?:{…}}`:
+  TTL must be positive under the deployment cap (default 168h); max_uses
+  clamps to 1–configured max (default 500); meta must be an object encoded
+  within 4096 bytes. The answer `{id,url,expires_at,max_uses}` shows the
+  **URL exactly once**.
+- Requires `VIAT_IM_BIND_BASE_URL`; the page prefix defaults to `/ui`;
+  proxy IP rate limiting needs trusted-proxy configuration.
 
-Native WeChat QR account provisioning is separate from sender→project-user binding. An editor may mint `POST …/im/bind-links` with `{platform:"weixin",label?,ttl_hours:24,max_uses:50,groups:[],meta?:{…}}`. TTL must be positive and is capped by deployment default maximum 168h; max_uses clamps 1–configured ceiling (default 500). meta must be an object <=4096 encoded bytes. Response `{id,url,expires_at,max_uses}` shows URL **once**. Requires `VIAT_IM_BIND_BASE_URL`; page prefix defaults `/ui`, proxy IP throttling requires trusted proxy configuration. The URL is an unauthenticated account-creation capability. A per-person identity assertion needs a short, one-use link issued **after your system authenticates them**; invitation meta outranks self-typed display name. List/revoke links and inspect uses before cleanup. Revocation prevents future use, not messages from accounts already created.
+> [!WARNING]
+> A bind URL is an **unauthenticated account-creation capability**:
+  per-person identity assertions must come as short-lived single-use links
+  issued by an authenticated person's business system; invitation meta
+  wins over a self-entered display_name. Review/revoke links and usage
+  before cleanup; revocation blocks future use only and **stops no already
+  created account**.
 
-Repo sync supports **chat**, not invented standalone chat CLI commands: `im/accounts/<name>.yaml` and `im/triggers/<name>.yaml`, `viat pull/push --only chat`. Resource-backed accounts and triggers mirror normally; inline/QR credential accounts are skipped on pull and protected from mirror deletion on push. Triggers can therefore reference accounts that are not portable. Missing resource-backed accounts/triggers locally can delete remote ones; diff first. Disable isolated triggers/accounts, revoke invitation links, remove test identity bindings and only then delete test configuration. Removing local files does not revoke provider credentials or undo external messages.
+The repo supports the **chat** collection with no standalone chat CLI:
+`im/accounts/<name>.yaml`, `im/triggers/<name>.yaml`,
+`viat pull/push --only chat`. Resource-credential accounts and triggers
+mirror normally; **inline/QR accounts are skipped on pull and not deleted
+when missing on push** — triggers referencing them are therefore not fully
+portable. Locally missing resource accounts/triggers delete their remote
+counterparts, so diff first. Cleanup order: disable test triggers/accounts
+→ revoke invitations → remove test identity bindings → delete the isolated
+config; deleting local files revokes no provider credentials or external
+messages.
 
-Evidence: `crates/viat-api/src/handlers/{im,im_bind,im_identities}.rs`, `im/{mod,dispatch}.rs`, `im/connector/*`; `crates/viat-core/src/types/im.rs`; `crates/viat-cli/src/repo/im.rs`. No live provider behavior was checked in this documentation task.
+## Verification basis
+
+Contract source `03751a67`:
+`crates/viat-api/src/handlers/{im,im_bind,im_identities}.rs`,
+`im/{mod,dispatch}.rs`, `im/connector/*`; `crates/viat-core/src/types/im.rs`;
+`crates/viat-cli/src/repo/im.rs`. Real provider behavior was not verified in
+this task.

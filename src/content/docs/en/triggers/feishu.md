@@ -9,22 +9,50 @@ contract_ids: []
 
 # Feishu long-connection bots
 
-Create a **self-built app** in the correct Feishu tenant, enable its bot, configure long-connection event reception and grant/subscribe the message events your use case needs (including `im.message.receive_v1`). Store its app_id/app_secret, publish/enable it for the intended users/chats in the provider console. Store apps are not this long-connection mode. Provider permissions and visibility remain necessary even when the Viat account saves successfully.
+Prepare on the Feishu side first: create a **self-built app** in the correct
+Feishu tenant, enable its bot, choose **long-connection** event reception,
+grant and subscribe the message events your use case needs (including
+`im.message.receive_v1`), then publish/enable it for the intended
+users/chats in the provider console. Store the app_id/app_secret. Store
+(marketplace) apps are not this long-connection mode — and **a successfully
+saved Viat account replaces neither provider permissions nor visibility
+configuration**.
 
-Default API base is `https://open.feishu.cn`. Feishu and international Lark share a connector but are distinct platform values/accounts. Bootstrap uses HTTP then a provider-specific protobuf-over-binary-WebSocket protocol; a generic JSON WebSocket subscription cannot replace it. The long-connection event body is not encrypted: configuring an Encrypt Key for this path is not a supported substitute for its authenticated transport.
+Transport mechanics:
 
-The connector receives direct and group messages; `require_mention:true` is meaningful. Set account `meta.bot_open_id` to the bot's real open id so mentions mean **this bot**, rather than any mentioned bot. Text and provider-specific raw events are normalized, not a promise that every media payload is downloaded. Replies and `viat.im_send` use provider REST delivery and its permission/rate limits; group visibility and API acceptance do not prove human receipt. Bootstrap/connect/REST have bounded timeouts; fragments have bounded assembly (5 seconds, 64 parts, 256 partial payloads), not an unbounded receive buffer.
+- Default API base `https://open.feishu.cn`. Feishu and international Lark
+  share one connector but remain distinct platform values/accounts.
+- Bootstrap is HTTP, followed by the provider's **protobuf-over-binary
+  WebSocket protocol** — a generic JSON WebSocket subscription cannot
+  replace it.
+- The long-connection event body is unencrypted; configuring an Encrypt Key
+  for this path is not a supported substitute for its authenticated
+  transport.
+- Direct and group messages are received, and `require_mention: true` is
+  meaningful here. Set the account's `meta.bot_open_id` to the bot's real
+  open id to distinguish "@ this bot" from "@ any bot".
+- `text`/`raw` are normalized; automatic download of every media type is not
+  promised. Replies and `viat.im_send` use the provider REST APIs under
+  permission/rate limits — **group visibility and an accepted API call do
+  not mean a human received it**.
+- Bootstrap/connect/REST all have deadlines; fragment reassembly caps at 5
+  seconds, 64 fragments and 256 in-flight payloads — not an unbounded
+  buffer.
 
-## Creation and responses
+## Create and respond
 
-Read the [complete shared fields, update/clear semantics, permissions and identity contract](chat-accounts.md) first. Create script `chat/reply` before the trigger:
+Read the [full shared contract for fields, updates/clearing, permissions and
+identity](chat-accounts.md) first. Create the script `chat/reply` before the
+trigger:
 
 ```python
 def main(message):
     return "received: " + message["text"]
 ```
 
-These source-derived examples are **unexecuted**; credentials are placeholders, no provider was contacted. Keep both objects disabled until permissions and the target are reviewed.
+Everything below is a **source-derived, unexecuted** example with placeholder
+credentials; no provider was accessed. Keep it disabled until permissions and
+targets are reviewed.
 
 ```http
 POST /projects/demo/im/accounts
@@ -42,12 +70,40 @@ Content-Type: application/json
 {"name":"assistant","platform":"feishu","enabled":false,"account":"assistant","chat_type":"any","require_mention":false,"target":{"kind":"script","name":"chat/reply"},"inputs":{},"params":{},"params_strict":false,"max_concurrent_runs":4,"identity_mode":"off"}
 ```
 
-Account response projection: `{"name":"assistant","platform":"feishu","enabled":false,"resource":null,"has_inline_credentials":true,"meta":{},"groups":[],"peer_identity":null,"status":"ok","status_message":null}`, plus id/created_at/updated_at. It never returns credentials. Trigger response uses `account_id:"<uuid>"`, `target_kind:"script"`, `target_name:"chat/reply"` instead of the submitted account/target objects, plus the full shared fields and ids/timestamps. Save returned ids and read list/health before enabling; an ok status is not a live-service test.
+Account response projection:
+`{"name":"assistant","platform":"feishu","enabled":false,"resource":null,"has_inline_credentials":true,"meta":{},"groups":[],"peer_identity":null,"status":"ok","status_message":null}`
+(plus id/created_at/updated_at; credentials never return). The trigger
+response substitutes `account_id:"<uuid>"`, `target_kind:"script"`,
+`target_name:"chat/reply"` for the submitted account/target objects, plus
+the shared full fields and id/timestamps. Save the id and read the
+list/health before enabling — **status ok is not a passed online test**.
 
-## Verification, recovery and cleanup
+## Verify, recover, clean up
 
-For an opted-in isolated provider account, enable by PUT while preserving all fields, send one synthetic message, compare normalized text/sender identity, reply and ledger/execution logs, then test a rejected identity. Multiple triggers can match; replies may therefore duplicate unless routing is deliberate. Target timeout and external effects follow the [shared delivery contract](chat-accounts.md); no automatic exactly-once/replay guarantee. If health is degraded check egress, provider app visibility, credentials and competing connections. needs_reauth requires corrected credentials, not repeated message sends. Disable trigger/account, account for in-flight work, revoke test invitations/identity bindings, then delete isolated objects. Provider-side app/credential revocation is separate.
+- Verify: enable via a PUT keeping every field, only against an explicitly
+  authorized isolated provider account; send one synthetic message and check
+  normalized text/sender, the reply, ledger and execution logs, then verify
+  identity refusals. Multiple triggers can match at once — bad routing
+  **replies repeatedly**.
+- Delivery semantics follow the [shared delivery contract](chat-accounts.md):
+  no automatic exactly-once or replay guarantee.
+- Failures: for `degraded` check egress, visibility scope, credentials and
+  competing connections; for `needs_reauth` update the correct credentials —
+  **do not keep sending messages**.
+- Cleanup: disable trigger/account and drain in-flight work → revoke test
+  invites/identity bindings → delete the isolated objects; provider
+  app/credential revocation is handled separately.
 
-Console: Triggers → Chat, Accounts/Populations/Triggers. API: `/projects/<slug>/im/accounts`, `/im/triggers`, account `/health` and `/messages`. Repo: `im/accounts/assistant.yaml`, `im/triggers/assistant.yaml`, `viat pull/push --only chat`; inline accounts are not exported or mirror-deleted. There is no standalone `feishu` CLI command or MCP connector tool.
+Entry points: console **Triggers → Chat** (Accounts/Populations/Triggers);
+APIs `/projects/<slug>/im/accounts`, `/im/triggers` plus per-account
+`/health`, `/messages`; repo `im/accounts/assistant.yaml`,
+`im/triggers/assistant.yaml`, `viat pull/push --only chat` (inline accounts
+are neither exported nor deleted by mirroring). There is no standalone
+`feishu` CLI or MCP connector tool.
 
-Evidence: `crates/viat-api/src/im/connector/feishu.rs`, `im/dispatch.rs`, `handlers/im.rs`; `crates/viat-core/src/types/im.rs`; `crates/viat-cli/src/repo/im.rs`. Provider provisioning/permissions and actual delivery were not exercised for this page.
+## Verification basis
+
+Contract source `03751a67`: `crates/viat-api/src/im/connector/feishu.rs`,
+`im/dispatch.rs`, `handlers/im.rs`; `crates/viat-core/src/types/im.rs`;
+`crates/viat-cli/src/repo/im.rs`. No provider configuration, permissions or
+real delivery were executed for this page.

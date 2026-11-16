@@ -9,11 +9,24 @@ contract_ids: []
 
 # Schedules: cron, interval and once
 
-Schedules are live configuration, not endpoint snapshots. A direct script/workflow target resolves its **draft** at fire time; an endpoint target follows the endpoint's current published snapshot. These are not equivalent deployment guarantees. The schedule management API currently requires an authenticated **project member**, including writes/manual firing; do not assume the editor-only restriction used by queue/WS subscriptions. Endpoint targets execute as the scheduler system principal and still need the scheduler role's applicable authorization, not the console operator's rights. Only published endpoint targets are accepted at save time; target resolution/permissions can still fail later.
+Schedules run targets automatically over time, with three trigger modes: cron,
+fixed interval, and one-shot. Two boundaries to internalize first:
 
-## Creation and full replacement
+- A schedule is **live configuration**, not an endpoint snapshot: a direct
+  script/workflow target resolves its **draft** at fire time, while an
+  endpoint target follows the current published snapshot — not equivalent
+  deployment guarantees.
+- Permissions: the management API (writes and manual firing included)
+  requires an authenticated **project member** — do not assume the
+  editor-only restriction of queue/WS subscriptions; but endpoint targets
+  execute as the scheduler system principal and need the scheduler role's
+  authorization, not the console operator's. Only published endpoint targets
+  are accepted at save time; target resolution/permissions can still fail
+  later.
 
-Source-derived/unexecuted example, with existing script `reports/nightly`:
+## Create and full update
+
+Source-derived, unexecuted example (script `reports/nightly` exists):
 
 ```http
 POST /projects/demo/schedules
@@ -23,47 +36,120 @@ Content-Type: application/json
 {"name":"nightly","trigger":{"kind":"cron","cron":"0 2 * * *","timezone":"Asia/Shanghai"},"target":{"kind":"script","name":"reports/nightly"},"inputs":{},"enabled":false,"on_overlap":"skip","max_attempts":1,"retry_backoff_secs":60,"catch_up":true}
 ```
 
-201 response example (synthetic timestamps/ids):
+Example 201 answer (ids/times synthetic):
 
 ```json
 {"id":"00000000-0000-4000-8000-000000000001","project_id":"00000000-0000-4000-8000-000000000002","name":"nightly","enabled":false,"trigger":{"kind":"cron","cron":"0 2 * * *","timezone":"Asia/Shanghai"},"target":{"kind":"script","name":"reports/nightly"},"inputs":{},"next_due_at":"2026-11-06T18:00:00Z","last_fired_at":null,"last_run_id":null,"on_overlap":"skip","queue_cap":null,"max_attempts":1,"retry_backoff_secs":60,"catch_up":true,"retry_attempt":0,"created_at":"2026-11-06T00:00:00Z","updated_at":"2026-11-06T00:00:00Z"}
 ```
 
-| Field | Default / validation |
+| Field | Default/validation |
 | --- | --- |
-| `name` | Required, 1–63 lowercase ASCII letters/digits/`_`/`-`, first character a letter. PUT body must match path name. |
-| `trigger` | Required tagged object: `cron`, `interval`, or `once` below. |
-| `target` | Required `{kind:script|workflow,name:"folder/name"}` or `{kind:endpoint,method:"POST",path:"/reports"}`. Endpoint method GET/POST/PUT/PATCH/DELETE; path starts `/`, contains no query/fragment. |
-| `inputs` | Must be a JSON object. Although deserialization defaults a missing value to null, validation rejects it: send `{}` explicitly. |
-| `enabled` | API and repo default **true**; console schedule creation also initializes true. Send false for a safe staged creation. (Queue console creation differs.) |
-| `on_overlap` | Omitted/null → `skip`; `queue` or `parallel` supported. |
-| `queue_cap` | Omitted/null is no configured cap; positive integer only with queue mode. |
-| `max_attempts` | Omitted/null → 1, allowed 1–10, includes initial automatic attempt. |
-| `retry_backoff_secs` | Omitted/null → 60, fixed 1–86400 seconds. |
-| `catch_up` | Omitted/null → true; false records sufficiently late occurrences as skipped instead of firing late. |
+| `name` | Required; 1–63 lowercase ASCII letters/digits/`_`/`-`, leading letter; the PUT body must match the path. |
+| `trigger` | Required kind-tagged object; cron/interval/once below. |
+| `target` | `{kind:script\|workflow,name:"folder/name"}` or `{kind:endpoint,method:"POST",path:"/reports"}`; endpoint methods are GET/POST/PUT/PATCH/DELETE, path starts with `/`, no query/fragment. |
+| `inputs` | Must be a JSON object; deserialization defaults to null but validation rejects it — send `{}` explicitly. |
+| `enabled` | API/repo default **true** (the console also initializes true). For staged rollouts set `false` explicitly. |
+| `on_overlap` | Omitted/null: `skip`; also `queue`, `parallel`. |
+| `queue_cap` | Omitted/null: no cap; positive integer in queue mode only. |
+| `max_attempts` | Omitted/null: 1; range 1–10, **including** the first attempt. |
+| `retry_backoff_secs` | Omitted/null: 60; fixed delay, range 1–86400 seconds. |
+| `catch_up` | Omitted/null: true; false records sufficiently-late fires as skipped instead of catching up. |
 
-`PUT /projects/<slug>/schedules/<name>` is a **full replacement**, not PATCH. Required name/trigger/target/inputs must be supplied, omitted optional values reset to defaults. Do not use it merely to toggle enabled or to change a field without retaining policy. Null is only accepted for optional fields, not for non-nullable booleans/objects. Updating recomputes due time. API output always echoes concrete cron timezone; `retry_attempt > 0` means next_due is a retry, not an ordinary trigger.
+`PUT /projects/<slug>/schedules/<name>` is a **full replacement**, not a
+PATCH:
 
-### Trigger modes and time
+- The required name/trigger/target/inputs must all be sent; omitted
+  optionals revert to defaults.
+- Use pause/resume to change only `enabled`; when changing other fields,
+  carry the policy over unchanged.
+- null applies to Option fields only, never plain booleans/objects.
+- Updates recompute due times; the answer always echoes the concrete cron
+  timezone; `retry_attempt > 0` means next_due is a retry time.
 
-- `{"kind":"cron","cron":"0 2 * * *","timezone":"Europe/London"}`: documented five-field minute/hour/day/month/weekday form; parser prepends seconds 0 (also accepts its supported year extension). IANA timezone defaults at **write time** to `VIAT_DEFAULT_SCHEDULE_TZ`, itself UTC; stored concretely, never reinterpreted when deployment default changes. Invalid zone/expression is 400.
-- `{"kind":"interval","every_secs":60}`: 10–86400 seconds, absolute intervals, not a timezone wall clock. Initial due is now + interval; missed downtime is not a durable occurrence-by-occurrence event archive.
-- `{"kind":"once","at":"2027-01-01T00:00:00Z"}`: RFC3339 instant, no more than ten years ahead. Past instants are accepted and due on the next tick. Auto-disables after claiming its firing; retry policy may re-arm a failed occurrence. Repeating a PUT of the **same already-fired instant** does not re-arm it, even if the file says enabled true. A new instant creates a new occurrence. Explicit resume deliberately re-arms the old instant, so a past once fires immediately.
+### Time modes
 
-DST: an ambiguous repeated wall-clock time fires at the **first occurrence only**; a nonexistent spring-forward time shifts to the first valid time after the gap. Several matches collapsed to the same gap-end instant fire once. Preview with `POST /projects/<slug>/cron/preview {"cron":"30 1 * * *","timezone":"Europe/London","count":5}` (count defaults 5, clamps 1–20): response `{"upcoming":["<UTC-instant>"],"timezone":"Europe/London"}`; may be empty for a valid expression with no future match.
+- **cron**: `{"kind":"cron","cron":"0 2 * * *","timezone":"Europe/London"}`
+  — standard five fields (minute/hour/day/month/weekday), the parser
+  prepends second 0 and supports its year extension. The IANA timezone is
+  taken **at write time** from `VIAT_DEFAULT_SCHEDULE_TZ` (default UTC) and
+  frozen into the row: later deployment-default changes never re-interpret
+  old schedules. Bad timezone/expression answers 400.
+- **interval**: `{"kind":"interval","every_secs":60}` — 10–86400 seconds,
+  absolute intervals, not a wall clock; first due is now + interval; downtime
+  does not build a per-tick persistent event archive.
+- **once**: `{"kind":"once","at":"2027-01-01T00:00:00Z"}` — RFC3339, up to
+  ten years ahead; past times are accepted (due on the next tick). Auto-
+  disables after one claim; the failure/retry policy can re-arm that run.
+  Re-PUTting the **same already-executed instant** re-enables nothing even
+  with enabled true — a new instant is a new schedule; an explicit resume
+  deliberately re-arms the old instant, and a past time fires immediately.
 
-## Fire, overlap, retry and replay
+**DST rules**: a repeated autumn wall-clock time fires **the first** time
+only; a nonexistent spring time moves to the first valid instant after the
+gap; multiple matches folding onto the same gap-end instant fire once.
 
-`GET …/schedules` lists; `GET …/<name>` shows; `POST …/<name>/pause` and `/resume` return the updated schedule. Pause stops new automatic work, not rollback of in-flight side effects; resume recomputes cron/interval from now, not all missed paused occurrences. Automatic catch-up is for downtime lateness, not replay of every historical tick. Skip refuses overlapping execution; queue retains pending work up to optional cap; parallel allows overlap. Cluster claims/leases coordinate instances but do not make external actions exactly-once. Automatic failures can retry with a fixed delay; manual run/replay is an explicit action, not a promise to perform the configured automatic retry sequence. A successful manual action can clear a booked retry. Use idempotent business keys.
+Preview: `POST /projects/<slug>/cron/preview
+{"cron":"30 1 * * *","timezone":"Europe/London","count":5}` — count defaults
+to 5, clamped 1–20; the answer is
+`{"upcoming":["<UTC-instant>"],"timezone":"Europe/London"}` and may be an
+empty array for a valid expression with no future match.
 
-`POST …/<name>/trigger` works as an explicit run and returns `{"request_id":"<uuid>"}` after the invocation path; 409 means already active/queue busy/full, 403 means scheduler authorization missing. `GET …/<name>/runs?limit=50&before=<timestamp>` clamps limit 1–200; each row has `id,schedule_id,request_id,target,inputs,status,attempt,started_at,finished_at,error_message`. Status is running/succeeded/failed/skipped. `GET …/runs/<run_id>` reads one. `POST …/runs/<run_id>/rerun` reuses **historical inputs and current target**, not historical source, and returns a new request id. It is not an old snapshot rollback.
+## Firing, overlap, retries and replay
 
-Runtime timeout applies per execution; queued/waiting does not authorize unlimited resource calls. There is no dedicated schedule cancellation route: pause blocks future fires, and any separately exposed cancellable async-run handle must be cancelled through its own API; do not claim pause killed a running script. Inspect run and execution logs before replaying a timed-out mutation.
+- `GET …/schedules` lists, `GET …/<name>` reads one; `POST …/<name>/pause`
+  and `/resume` return the updated schedule. **Pausing only stops future
+  automatic work** and rolls back nothing in flight; cron/interval resume
+  recomputes from now without replaying the paused history. Catch-up covers
+  downtime lateness, not a replay archive of every tick.
+- Overlap: `skip` refuses overlap; `queue` stores pending runs up to the
+  optional cap; `parallel` allows concurrency. Cluster claim/lease
+  coordinates instances and **does not guarantee** exactly-once external
+  effects; automatic failures retry at the fixed delay. Manual trigger/replay
+  is an explicit action and does not run the full automatic retry sequence;
+  a successful manual action clears a scheduled retry. **Business logic must
+  be idempotent.**
+- `POST …/<name>/trigger` answers `{"request_id":"<uuid>"}`; 409 = already
+  running/queue busy or full; 403 = insufficient scheduler authorization.
+- `GET …/<name>/runs?limit=50&before=<timestamp>`: limit clamped 1–200; rows
+  carry `id,schedule_id,request_id,target,inputs,status,attempt,started_at,
+  finished_at,error_message` with status running/succeeded/failed/skipped.
+  `GET …/runs/<run_id>` reads one; `POST …/runs/<run_id>/rerun` uses the
+  **historical inputs with the current target** — not historical source,
+  returns a new request id, and is not a snapshot rollback.
 
-## CLI, repo, verification and cleanup
+> [!WARNING]
+> Timeouts apply per execution budget — queuing is not a license to unlimited
+> resources. There is no dedicated schedule-cancel route: pause only blocks
+> future fires; if a cancellable async-run handle exists, use that API.
+> **Never claim pause killed a running script.** Before replaying a timed-out
+> change, inspect the runs and execution logs.
 
-`viat schedule create nightly --cron '0 2 * * *' --script reports/nightly --inputs '{}' --disabled` is supported, as are list/show/update/delete/pause/resume/trigger. The create/update CLI supports cron/interval and script/workflow **only**: no guessed once/timezone/endpoint/retry flags. Use API or `schedules/nightly.yaml` for the full surface. Repo files carry trigger/target/inputs/enabled/overlap/retry/catch-up and mirror through `viat pull/push`; missing local schedules can delete remote schedules, so diff a complete checkout first. A narrow CLI full update can reset policy it does not send.
+## CLI, repository, verification, cleanup
 
-Verify disabled creation, cron preview, intended scheduler permissions, one manual run and log output before enabling in an isolated project. Stop by pause, account for current runs/queued work, then `DELETE …/<name>` (204); deleting the schedule does not undo writes/messages. No native HomeAssistant, MQTT or Slurm scheduler connector exists; use explicit scripts/resources/adapters, not invented trigger kinds.
+```sh
+viat schedule create nightly --cron '0 2 * * *' --script reports/nightly --inputs '{}' --disabled
+```
 
-Evidence: `crates/viat-api/src/handlers/schedules.rs`, `scheduler.rs`, `schedule_target.rs`, `scheduler_cluster.rs`; `crates/viat-db/src/schedules.rs`, `schedules_due.rs` (DST tests); `crates/viat-cli/src/repo/schedules.rs`, `commands/schedule.rs`; console `pages/schedules/ScheduleDrawer.tsx`. Examples were not run.
+list/show/update/delete/pause/resume/trigger also exist. Note: **the
+standalone create/update CLI supports only cron/interval with
+script/workflow** — do not invent once/timezone/endpoint/retry flags; use the
+API or the repo file `schedules/nightly.yaml` (carrying
+trigger/target/inputs/enabled/overlap/retry/catch-up, mirrored by
+`viat pull/push`; a local deletion can delete the remote schedule, so diff
+against a complete checkout first). The narrow CLI's full-update may reset
+policies you did not send.
+
+Rollout order: create `disabled` → verify the cron preview, scheduler
+permissions and one manual run's logs → enable. To stop: pause first, drain
+current/queued work, then `DELETE …/<name>` (204); **deletion does not undo
+writes/messages already produced**. There are no native
+HomeAssistant/MQTT/Slurm scheduling connectors — those need explicit
+scripts/resources/adapters; never invent target kinds.
+
+## Verification basis
+
+Contract source `03751a67`: `crates/viat-api/src/handlers/schedules.rs`,
+`scheduler.rs`, `schedule_target.rs`, `scheduler_cluster.rs`;
+`crates/viat-db/src/schedules.rs` and `schedules_due.rs` (DST tests);
+`crates/viat-cli/src/repo/schedules.rs`, `commands/schedule.rs`; the console's
+`pages/schedules/ScheduleDrawer.tsx`. Examples unexecuted.

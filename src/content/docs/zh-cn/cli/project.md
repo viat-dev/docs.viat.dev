@@ -325,7 +325,7 @@ viat project select cli-demo
 
 **失败处理、验证与清理。** 未知/不可访问 slug 退出 1，不会选中。用 project list 核查；选回原 slug 即可恢复。
 
-## 实现核对依据
+## 核验依据
 
 语法来自固定 Clap 合同与 main.rs；行为/权限核对以下源文件，路径相对产品仓库根。
 

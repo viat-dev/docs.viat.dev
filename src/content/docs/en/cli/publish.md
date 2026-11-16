@@ -170,7 +170,7 @@ viat publish show 00000000-0000-4000-8000-000000000001 --json
 
 **Failure handling, verification and cleanup.** Missing/ambiguous prefix fails: use full ID from history. Reading does not roll back or publish; no cleanup.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

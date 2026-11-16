@@ -106,7 +106,7 @@ viat apikey revoke demo_keys 00000000-0000-4000-8000-000000000001
 
 **Failure handling, verification and cleanup.** Use apikey list to get UUID. No un-revoke CLI: mint a replacement and update consumers; verify list revoked timestamp/status.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

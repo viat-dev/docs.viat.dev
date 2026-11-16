@@ -167,7 +167,7 @@ viat authorizer update demo_password --clear-default-role
 
 **Failure handling, verification and cleanup.** No flag/unknown role fails. Record previous role name and restore with update; clear explicitly rather than omitting. Verify show, and review effects on newly resolved client identities.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

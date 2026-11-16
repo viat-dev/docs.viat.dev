@@ -141,6 +141,6 @@ Enabled defaults TRUE and can arm real execution immediately, including a past o
 
 Verification is observational: inspect the documented result fields and use the corresponding read tools before and after any authorized mutation. Do not verify by sending production traffic or deleting unrelated objects.
 
-## Maintenance evidence
+## Verification basis
 
 Input inventory: `contracts/1.1.0/mcp-tools.json`, tool `upsert_schedule`. Implementation/tests under the pinned product source: `schedules.rs; handlers/schedules.rs; tests/it/tool_upsert_schedule.rs`. Tool module filenames refer to `crates/viat-mcp/src/tools/`; API handlers refer to `crates/viat-api/src/handlers/`. Shared transport/error evidence: `crates/viat-mcp/src/tools/service.rs`, `http.rs`, `error.rs`; tests were inspected, not run for this documentation change.

@@ -21,7 +21,72 @@ const example = entry.data.doc_id?.startsWith('applications.') ? entry.data.doc_
   </p>}
 </aside>}
 <MarkdownContent><slot /></MarkdownContent>
+<script>
+  // Handbook tabs (:::tabs blocks rendered by scripts/lib/tabs-remark.mjs).
+  // Selection is remembered per group id and shared by every group with the
+  // same id on the page, mirroring how a choice of Console/CLI/MCP carries
+  // through a whole guide. Without JavaScript all panels simply stay visible.
+  const containers = [...document.querySelectorAll<HTMLElement>('.vtabs')];
+  const remembered = new Map<string, number>();
+  const readRemembered = (groupId: string) => {
+    if (remembered.has(groupId)) return remembered.get(groupId) ?? 0;
+    try {
+      const value = localStorage.getItem(`vtabs:${groupId}`);
+      const index = value === null ? 0 : Number(value);
+      remembered.set(groupId, Number.isInteger(index) && index >= 0 ? index : 0);
+    } catch { remembered.set(groupId, 0); }
+    return remembered.get(groupId) ?? 0;
+  };
+  const paint = (container: HTMLElement, active: number) => {
+    container.querySelectorAll<HTMLButtonElement>('.vtabs-tab').forEach((tab, i) => {
+      tab.setAttribute('aria-selected', String(i === active));
+      tab.tabIndex = i === active ? 0 : -1;
+    });
+    container.querySelectorAll<HTMLElement>('.vtabs-panel').forEach((panel, i) => {
+      panel.toggleAttribute('hidden', i !== active);
+    });
+  };
+  for (const container of containers) {
+    const tabs = [...container.querySelectorAll<HTMLButtonElement>('.vtabs-tab')];
+    const groupId = container.dataset.vtabsGroup ?? null;
+    const select = (index: number, focus = false) => {
+      const active = Math.min(Math.max(index, 0), tabs.length - 1);
+      paint(container, active);
+      if (groupId) {
+        remembered.set(groupId, active);
+        try { localStorage.setItem(`vtabs:${groupId}`, String(active)); } catch { /* ignore */ }
+        for (const other of document.querySelectorAll<HTMLElement>(`[data-vtabs-group="${groupId}"]`)) {
+          if (other !== container) paint(other, active);
+        }
+      }
+      if (focus) tabs[active]?.focus();
+    };
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => select(index));
+      tab.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowRight') select(index + 1, true);
+        if (event.key === 'ArrowLeft') select(index - 1, true);
+        if (event.key === 'Home') select(0, true);
+        if (event.key === 'End') select(tabs.length - 1, true);
+      });
+    });
+    select(groupId ? readRemembered(groupId) : 0);
+  }
+</script>
 <style>
   aside { border-inline-start: 3px solid var(--sl-color-gray-4); padding-inline-start: 1rem; margin-block-end: 1.5rem; color: var(--sl-color-gray-2); font-size: var(--sl-text-sm); }
   aside p + p { margin-block-start: 0.5rem; }
+</style>
+<style is:global>
+  /* Underline tabs: transparent bar, one shared baseline, panel-aligned left
+     edge. The active indicator (2px) overlaps the separator (1px) so the two
+     lines read as one. */
+  .vtabs { margin-block: 1.25rem; border: 1px solid var(--sl-color-gray-6); border-radius: 0.5rem; overflow: hidden; }
+  .vtabs-list { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.25rem; border-bottom: 1px solid var(--sl-color-gray-6); padding: 0 1.1rem; }
+  .vtabs-tab { appearance: none; background: transparent; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; color: var(--sl-color-gray-2); font: inherit; font-size: var(--sl-text-sm); font-weight: 600; line-height: 1.2; padding: 0.55rem 0.9rem 0.45rem; cursor: pointer; border-radius: 0; }
+  .vtabs-tab:hover { color: var(--sl-color-white); }
+  .vtabs-tab[aria-selected='true'] { color: var(--sl-color-white); border-bottom-color: var(--sl-color-accent); }
+  .vtabs-panel { padding: 1rem 1.1rem 1.25rem; }
+  .vtabs-panel > :first-child { margin-block-start: 0; }
+  :root[data-theme='light'] .vtabs-tab:hover, :root[data-theme='light'] .vtabs-tab[aria-selected='true'] { color: var(--sl-color-gray-12, #1a1c23); }
 </style>

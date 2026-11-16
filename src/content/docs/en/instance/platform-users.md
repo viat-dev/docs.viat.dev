@@ -8,27 +8,36 @@ channel: stable
 
 # Platform users and sign-in
 
-A **platform user** signs in to the console, CLI, or native app. This account is not a project end user. Its platform role governs instance administration; an independent membership role governs each project. A platform `operator` may legitimately be a project `owner`.
+A **platform user** signs in to the console, CLI or native app — and is
+**not** a project end user. The platform role governs instance
+administration; each project is governed by its own membership role. A
+platform `operator` can perfectly well be a project's `owner`.
 
-## Prerequisites and permission matrix
+## Prerequisites and the permission matrix
 
-You need the instance's base URL and a platform account, or host access to bootstrap a new installation. The instance must be activated for user-directory and project-management routes; login and activation remain available while locked.
+You need the instance base URL and a platform account; bootstrapping a
+fresh install additionally needs host access. User-directory and
+project-management routes require an activated instance — signing in and
+activating still work while locked.
 
-| Action | Required authority |
+| Action | Required |
 | --- | --- |
-| Sign in / inspect your identity | Your platform credentials and any required MFA |
+| Sign in / view own identity | Own credentials plus any required MFA |
 | List platform users | Platform `admin` or `owner` |
-| Invite an account without a project | Platform `admin` or `owner` |
-| Invite a new account into a project | That project's `admin` or `owner`; platform Admin is not required |
-| Change a platform role | Platform `owner` only |
+| Invite an account without project access | Platform `admin` or `owner` |
+| Invite a new account into a project | That project's `admin`/`owner`; **no** platform Admin needed |
+| Change platform roles | Platform `owner` only |
 | Reset another account's MFA | Platform `owner` only |
-| Add an existing user to a project | That project's `admin` or `owner` |
+| Add an existing account to a project | That project's `admin`/`owner` |
 
-The literal role values are `owner`, `admin`, `developer`, and `operator`. Changing a platform role does not grant project membership or change project roles. Project callers managed with `viat p-user` are a separate identity plane.
+Role literals: `owner`, `admin`, `developer`, `operator`. Changing a
+platform role grants **no** project membership and changes no project
+role; project callers managed via `viat p-user` are a different identity
+plane.
 
 ## 1. Bootstrap the initial Owner
 
-For a new deployment set both:
+Set these together on a fresh deployment:
 
 ```dotenv
 VIAT_DEFAULT_ADMIN_EMAIL=admin@example.com
@@ -36,23 +45,45 @@ VIAT_DEFAULT_ADMIN_PASSWORD=REPLACE_WITH_A_STRONG_PRIVATE_PASSWORD
 VIAT_ALLOW_REGISTRATION=false
 ```
 
-Replace the email/password before use. These are server configuration values, not a command to register a user. Startup creates the missing account as platform `owner` and never overwrites an existing account. Supplying the email without a password skips the seed with a warning. Changing the environment password later is not a reset procedure.
+Replace the email and password before use. Essentials:
 
-The native server's registration default is `true`; the official image overrides it to **`false`**. When registration is disabled, public registration routes return `403`. The first account created on an empty platform receives `owner`; later ordinary accounts default to `operator`. Do not temporarily expose a fresh public registration page to race for the first Owner—use protected bootstrap configuration.
+- This is **server configuration**, not a user-registration command.
+  Startup creates the missing account as platform `owner` and **never
+  overwrites** an existing one; an email without a password skips
+  bootstrap with a warning; later changing the environment password is
+  **not** a reset mechanism.
+- Native server registration defaults to `true`; the official image
+  overrides it to **`false`**, after which the public registration route
+  answers `403`. The first account created on an empty platform becomes
+  `owner`; subsequent ordinary accounts default to `operator`. **Never**
+  briefly expose public registration to race for the first Owner — use
+  the protected bootstrap configuration.
 
-## 2. Sign in through the console
+## 2. Sign in on the console
 
-1. Open the actual instance URL, usually `/ui/` after the root redirect.
-2. Enter the platform email/password, or select an OIDC provider configured by your operator.
-3. If an authenticator is enrolled, enter a fresh TOTP or an unused recovery code. If the deployment requires enrollment, complete it before expecting a session.
-4. If activation is required, a platform Owner/Admin follows [Activation](activation.md).
-5. Check the account menu and project selector. An empty project list usually means missing membership, not a broken login.
+1. Open the instance URL (the root usually redirects to `/ui/`).
+2. Enter the platform email/password, or pick an operations-configured
+   OIDC provider.
+3. With an enrolled authenticator, enter a fresh TOTP or an unused
+   recovery code; if the deployment requires enrollment first, complete
+   it before expecting a session.
+4. When activation is needed, a platform Owner/Admin follows
+   [activation](activation.md).
+5. Check the account menu and project picker — an empty project list
+   usually means **missing membership**, not a failed login.
 
-The account menu's Security/session controls are the place to enroll MFA, manage recovery codes, change your password, and inspect/revoke sessions. Store recovery codes privately; they are shown once and are single-use. Do not assume an invitation's “temporary” password is automatically one-use or that a forced-change screen is guaranteed—change it as an explicit first task.
+The account menu's security/session controls handle MFA enrollment,
+recovery-code management, own-password changes and session viewing/
+revocation. Recovery codes display once and are single-use — store them
+privately. **Never** assume an invitation's "temporary" password is
+automatically one-time or that a forced password-change page appears;
+treat changing the initial password as an explicit first task.
 
-## 3. Sign in through the CLI
+## 3. Sign in on the CLI
 
-Use CLI `1.1.0`. Start in a dedicated private working directory that is not another project's checkout. The following prompts are **Bash** syntax:
+Use CLI `1.1.0` starting from a dedicated private working directory
+(never inside another project's working copy). Prompts below use
+**Bash** syntax:
 
 ```bash
 mkdir viat-session
@@ -67,66 +98,113 @@ viat auth whoami
 viat version
 ```
 
-For the local Compose installation, enter `http://127.0.0.1:8080` as the base URL. Include a reverse-proxy mount prefix when applicable, but do not append `/ui` or `/projects`. Expected output starts `logged in as <your-email>`; `whoami` prints that email. `viat version` prints the CLI release and, when available, the server release.
+- A local Compose install's base URL is `http://127.0.0.1:8080`; with a
+  reverse-proxy mount prefix include it, but **never** append `/ui` or
+  `/projects`. Expected: output starting `logged in as <your-email>`;
+  `whoami` printing the same email; `viat version` showing the CLI
+  version plus the server's when available.
+- Password sign-in requires both `--email` and `--password` — omitting
+  them **never** prompts; `read -s` keeps the password out of history,
+  but the argument is briefly visible to local processes — use a trusted
+  workstation. Second-factor is prompted interactively; non-interactive
+  use takes `--totp CODE`; on `mfa_enrollment_required`, enroll once in
+  the console first. With SSO configured use
+  `viat auth login --server URL --oidc NAME` and **never** mix in
+  password flags.
+- The session lives in `.viat/config.yaml` (bearer/refresh credentials):
+  never commit or paste it; discovery walks upward for
+  `.viat/config.yaml`; `VIAT_CONFIG_DIR` names the config **directory
+  itself**. Logins against different servers avoid overwriting ancestor
+  sessions, but separate directories are safest; protect the directory
+  and its backups.
 
-Both `--email` and `--password` are required for password login; omitting them does **not** prompt for them. The shell prompts above avoid literal passwords in shell history, but the CLI's password argument is briefly visible to local process inspection. Use a trusted workstation. The CLI prompts interactively for the second factor when needed; non-interactive use supplies `--totp CODE`. If it reports `mfa_enrollment_required`, enroll once in the console before retrying. Configured SSO instead uses `viat auth login --server URL --oidc NAME`, not password flags.
+## 4. Invite and join members deliberately
 
-The session is saved in `.viat/config.yaml` and includes bearer/refresh credentials. Never commit or paste it. Normal lookup searches upward for a `.viat/config.yaml`; `VIAT_CONFIG_DIR` explicitly selects the config **directory itself**. A login for a different server avoids overwriting an ancestor's session, but deliberate directory separation remains the safest habit. Protect the directory and backups too.
-
-## 4. Invite and enroll people deliberately
-
-As a platform Admin/Owner, invite a platform account without granting project access:
+A platform Admin/Owner can invite an account without granting project
+access:
 
 ```sh
 viat user invite --email colleague@example.com --display-name "Colleague"
 viat user ls --json
 ```
 
-Use the real intended recipient address. Expected invitation output includes `invited: ...` and a generated `temp_password` **once**. Share it out of band, not in chat logs or a committed terminal transcript. This creates an account; it does not promise to send an email invitation. The account sees no project until enrolled.
-
-If you are a project's Owner/Admin and want to create and enroll in one operation:
+- Substitute the real intended recipient. The invitation output carries
+  `invited: ...` and the **once-shown** `temp_password` — deliver it
+  out-of-band, never into chat logs or committed transcripts. The
+  operation creates the account and **promises no** invitation email;
+  before joining a project the account sees none.
+- A project Owner/Admin creating-and-joining in one step:
 
 ```sh
 viat user invite --email teammate@example.com --project hello-lab --role developer
 ```
 
-`--project` and `--role` must be supplied together. An existing email returns a conflict: use [project member add](../projects/create-and-collaborate.md), not a second invitation. Optional `--temp-password` sets an initial password of at least eight characters; it places a secret in arguments, so the generated-password flow is preferable for interactive administration.
+  `--project` and `--role` must be supplied together. An existing email
+  conflicts — use [adding project members](../projects/create-and-collaborate.md)
+  instead of re-inviting. The optional `--temp-password` presets a ≥8-
+  character initial password but puts the secret into an argument; the
+  generated-password flow suits interactive administration better.
 
 ## 5. Delegate platform authority
 
-A platform Owner may promote an existing account:
+- A platform Owner promotes an existing account:
 
 ```sh
 viat user set-role colleague@example.com admin
 viat user ls --json
 ```
 
-This gives platform administration, **not** project Admin rights. Use the project member workflow for those. Only an Owner can change platform roles; the last platform Owner cannot be demoted. Establish a second trusted Owner and verify their sign-in before removing the only recovery path.
-
-An Owner can reset lost MFA with `viat user reset-mfa colleague@example.com`. This clears the second factor and signs that account out everywhere; if the deployment policy requires MFA, the account must enroll again. It is an incident/recovery action, not a routine way to bypass MFA. A last-Owner lockout requires a separately controlled operator recovery process; do not distribute database-editing recovery commands to ordinary users.
+  This grants **platform** administrative rights, not project Admin —
+  project authority goes through project membership. Only Owners change
+  platform roles; **the last platform Owner cannot be demoted**; before
+  removing your only recovery channel, establish a second trusted Owner
+  and verify their sign-in.
+- Owners may run `viat user reset-mfa colleague@example.com` for lost
+  MFA: it clears the second factor and signs the account out of all
+  sessions; under a required policy the account must re-enroll. This is
+  **incident recovery**, not a routine bypass. A locked-out last Owner
+  needs a controlled operations recovery procedure — never distribute
+  direct database-editing recovery commands to ordinary users.
 
 ## Troubleshooting
 
 | Symptom | Check |
 | --- | --- |
-| Correct login, no projects | Ask a project's Owner/Admin for membership; platform role is independent |
-| Invitation receives `403` | Without `--project`, platform Admin/Owner is needed; with it, target project Admin/Owner is needed |
-| `--project`/`--role` validation error | Supply both, or neither |
-| Existing email conflict | Add the existing account as a member rather than invite again |
-| `401 mfa_required` | Complete the current challenge; use a fresh authenticator/recovery code |
-| Every TOTP fails | Check clocks, correct instance's authenticator entry, and replay of an already used code |
-| `429` | Respect `Retry-After`; repeated password attempts worsen throttling |
-| Bootstrap password edit has no effect | Bootstrap never overwrites an existing user; change password through account controls |
-| `403 license_required` | Activate with a platform Admin/Owner; user-directory access is not gate-exempt |
+| Signed in but no projects | Ask the project Owner/Admin to add membership; platform roles are separate |
+| Invitation gets `403` | Without `--project` needs platform Admin/Owner; with it, the target project's Admin/Owner |
+| `--project`/`--role` validation error | Provide both or neither |
+| Existing-email conflict | Add the existing account as a member; do not re-invite |
+| `401 mfa_required` | Complete the challenge: a fresh authenticator code or unused recovery code |
+| Every TOTP fails | Clock skew, the right instance's authenticator entry, reuse of a consumed code |
+| `429` | Honor `Retry-After`; hammering passwords deepens the limit |
+| Changing the bootstrap password does nothing | Bootstrap never overwrites existing users; change it via account controls |
+| `403 license_required` | A platform Admin/Owner activates; the user directory is not exempt from the gate |
 
-Default access-token lifetime is **3600 seconds** and refresh-session lifetime **2592000 seconds** (30 days), configurable by the operator. Refresh does not ask for TOTP again. Treat a stolen refresh credential as a session compromise, not just a one-hour problem.
+Default access-token lifetime is **3600 seconds** and refresh sessions
+**2592000 seconds** (30 days), operator-adjustable; refresh **never**
+re-asks TOTP. A stolen refresh credential is a **session compromise**,
+not a one-hour risk.
 
-## Sign out and remove access
+## Sign-out and removing access
 
-`viat auth logout` clears local login credentials and current project in the resolved CLI config. In this release it is **local cleanup**, not a server-side revocation request; do not equate it with terminating a stolen session. Use the console's session controls to revoke server sessions, and revoke personal access tokens separately. The saved `project_token` is not cleared by this command in 1.1.0; logging out is not a complete credential wipe. When retiring a workstation, inspect the resolved configuration privately and remove remaining project credentials after revoking them through their issuing system.
-
-Removing someone from a project is described in [Create and collaborate](../projects/create-and-collaborate.md). It blocks that project's management access on the next request but does not delete the platform account or their project content. Do not invent a `viat user delete` command: this CLI has no such command.
+- `viat auth logout` clears the resolved CLI config's local login
+  credentials and current project. In this release it is **local
+  cleanup**, not a server-side revocation — it cannot terminate a stolen
+  session; revoke server sessions via the console's session management
+  and PATs separately. The command **does not** clear a saved
+  `project_token`: logging out ≠ fully erasing credentials. When
+  retiring a workstation, privately inspect the config files actually
+  used and remove residual project credentials after revoking them at
+  the issuing system.
+- Removing project membership:
+  [creating projects together](../projects/create-and-collaborate.md) —
+  management access to that project dies on the next request while the
+  platform account and project content are **not** deleted. **Never**
+  invent `viat user delete` — this CLI has no such command.
 
 ## Verification basis
 
-Contract source `03751a67`: `crates/viat-api/src/handlers/{auth,users}.rs`, `crates/viat-db/src/users.rs`, `crates/viat-cli/src/{main,config}.rs`, `crates/viat-cli/src/commands/{auth,user}.rs`, and `Dockerfile`.
+Contract source `03751a67`:
+`crates/viat-api/src/handlers/{auth,users}.rs`, `crates/viat-db/src/users.rs`,
+`crates/viat-cli/src/{main,config}.rs`,
+`crates/viat-cli/src/commands/{auth,user}.rs`, `Dockerfile`.

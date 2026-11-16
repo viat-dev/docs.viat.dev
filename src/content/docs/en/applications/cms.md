@@ -176,4 +176,8 @@ Retain the schema/database for inspection by default. Only after proving exclusi
 
 ## Related contracts and evidence
 
-[Repo sync](../projects/repo-sync.md), [authorization](../auth/authorization.md), [HTTP](../triggers/http.md), [CRUD alternative](../triggers/crud.md), [PostgreSQL](../assets/resources/postgresql.md). The explicit script checks are needed because this design does not use CRUD. Targeted implementation evidence: `crates/viat-cli/src/repo/{viat_yaml.rs,endpoints.rs}`, `crates/viat-api/src/{lib.rs,handlers/endpoints.rs}`, `crates/viat-runtime/src/{python.rs,annotations.rs}`. Source review is not integration acceptance.
+[Repo sync](../projects/repo-sync.md), [authorization](../auth/authorization.md), [HTTP](../triggers/http.md), [CRUD alternative](../triggers/crud.md), [PostgreSQL](../assets/resources/postgresql.md). The explicit script checks are needed because this design does not use CRUD.
+
+## Verification basis
+
+Targeted implementation evidence: `crates/viat-cli/src/repo/{viat_yaml.rs,endpoints.rs}`, `crates/viat-api/src/{lib.rs,handlers/endpoints.rs}`, `crates/viat-runtime/src/{python.rs,annotations.rs}`. Source review is not integration acceptance.

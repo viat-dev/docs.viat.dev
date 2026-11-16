@@ -177,4 +177,8 @@ Despite the CLI argument name, `KEY_ID_FROM_CREATE` must be the actual **API-key
 
 ## Contract and unverified boundaries
 
-Based on [repo-sync](../projects/repo-sync.md), [HTTP dispatch](../triggers/http.md), [script context](../assets/scripts/context.md), [endpoint auth](../auth/endpoints.md) and the SQLite/crypto references. Targeted implementation evidence: `crates/viat-runtime/src/python.rs` (`_Sql`, `_Tx`, crypto verify), `crates/viat-api/src/runner/broker.rs` (SQLite transaction opening), `crates/viat-cli/src/repo/{resources,endpoints}.rs`. Source reading is not live verification. Provider signature compatibility, credential rotation, real broker/concurrency behavior, deployment networking and publication still need separately approved integration checks; this validator makes no such claim.
+Based on [repo-sync](../projects/repo-sync.md), [HTTP dispatch](../triggers/http.md), [script context](../assets/scripts/context.md), [endpoint auth](../auth/endpoints.md) and the SQLite/crypto references. Source reading is not live verification. Provider signature compatibility, credential rotation, real broker/concurrency behavior, deployment networking and publication still need separately approved integration checks; this validator makes no such claim.
+
+## Verification basis
+
+Targeted implementation evidence: `crates/viat-runtime/src/python.rs` (`_Sql`, `_Tx`, crypto verify), `crates/viat-api/src/runner/broker.rs` (SQLite transaction opening), `crates/viat-cli/src/repo/{resources,endpoints}.rs`.

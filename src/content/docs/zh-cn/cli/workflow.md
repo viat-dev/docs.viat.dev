@@ -212,7 +212,7 @@ viat workflow update demo_flow --file demo-workflow.yaml
 
 **失败处理、验证与清理。** 定义校验失败退出 1。保留旧 YAML、show 核查；仅明确允许真实副作用后 test；恢复旧定义回退草稿。
 
-## 实现核对依据
+## 核验依据
 
 语法来自固定 Clap 合同与 main.rs；行为/权限核对以下源文件，路径相对产品仓库根。
 

@@ -1,8 +1,11 @@
-import { mkdir, readFile, writeFile, rm, lstat } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rm, lstat, readdir, copyFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ROOT, LOCALES, readPages, pairErrors, resolveMarkdownLink } from './lib/content.mjs';
 import { inspectMarkdown } from './lib/markdown.mjs';
+import { convertTabsForBook } from './lib/tabs.mjs';
+import { stripVerificationBasis } from './lib/hide-basis.mjs';
 import { publicUrl } from './lib/site.mjs';
+import { ASSET_PREFIXES } from './lib/validation.mjs';
 
 // Export only the allowlisted content tree, never the product docs directory
 // with its private feedback and historical plans. Deployment is a separate step.
@@ -51,11 +54,23 @@ for (const locale of LOCALES) {
       const index = chunk.lastIndexOf(link.url);
       if (index < 0) throw new Error(`${page.relative}: cannot safely rewrite root link ${link.url}`);
       const resolved = resolveMarkdownLink(page.relative, link.url);
-      const replacement = resolved
-        ? path.posix.relative(path.posix.dirname(page.relative), resolved.target) + resolved.suffix
-        : publicUrl(link.url);
+      let replacement;
+      if (ASSET_PREFIXES.some((prefix) => link.url.startsWith(prefix))) {
+        // Screenshots and diagrams ship inside the book so pages stay
+        // readable offline instead of pointing at the website.
+        replacement = path.posix.relative(path.posix.dirname(page.relative), link.url.slice(1));
+      } else if (resolved) {
+        replacement = path.posix.relative(path.posix.dirname(page.relative), resolved.target) + resolved.suffix;
+      } else {
+        replacement = publicUrl(link.url);
+      }
       body = body.slice(0, start + index) + replacement + body.slice(start + index + link.url.length);
     }
+    // Tabs become labelled sections: the book has no page scripts by design.
+    body = convertTabsForBook(body);
+    // Maintenance evidence stays in Raw Markdown; readers of the book do not
+    // need the contract-source appendix.
+    body = stripVerificationBasis(body);
     const title = body.trimStart().startsWith('# ') ? '' : `# ${page.data.title}\n\n`;
     const notice = locale === 'zh-cn'
       ? `核验版本：${page.data.verified_release}；文档 ID：${page.data.doc_id}。`
@@ -66,6 +81,22 @@ for (const locale of LOCALES) {
     const download = example ? `\n\n[${locale === 'zh-cn' ? '完整示例文件' : 'Complete example files'}](${path.posix.relative(path.posix.dirname(page.relative), `examples/${example}/index.html`)})\n` : '';
     await writeFile(target, `${title}> ${notice}\n\n${body.trim()}${download}\n`);
     summary.push(`- [${page.data.title.replaceAll('[', '').replaceAll(']', '')}](${page.relative})`);
+  }
+}
+
+// Copy the static assets the pages reference, so every chapter reads
+// offline exactly like the website does.
+for (const prefix of ASSET_PREFIXES) {
+  const source = path.join(ROOT, 'public', prefix);
+  const target = path.join(output, 'src', prefix);
+  let entries;
+  try { entries = await readdir(source, { withFileTypes: true, recursive: true }); }
+  catch (error) { if (error.code !== 'ENOENT') continue; throw error; }
+  for (const entry of entries) {
+    if (entry.isDirectory() || entry.isSymbolicLink()) continue;
+    const relative = path.relative(source, path.join(entry.parentPath ?? entry.path, entry.name));
+    await mkdir(path.dirname(path.join(target, relative)), { recursive: true });
+    await copyFile(path.join(source, relative), path.join(target, relative));
   }
 }
 

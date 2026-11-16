@@ -9,13 +9,27 @@ contract_ids: []
 
 # Inbound WebSocket endpoints
 
-Here **clients connect to Viat**. [WebSocket subscriptions](websocket-subscriptions.md) dial outward and are a different object. A GET leaf upgrades to a socket and runs **scripts only**, not workflows, on connect/message/disconnect. It suits low-rate turn-based interaction, not a frame-synchronization game loop, durable broker or binary protocol.
+This is the direction where **clients connect to Viat**: a GET leaf upgrades
+to a socket and routes messages to scripts. It is a different object from the
+outward-dialing [WebSocket subscriptions](websocket-subscriptions.md).
+Events (connect/message/disconnect) run **scripts only** — no workflow
+targets. It suits low-rate turn-based interaction, not frame-synchronized
+game loops, durable brokers or binary protocols.
 
-Content-edit rights manage the endpoint; publish rights publish/rollback it. The handshake enforces the published authorizers, gates and endpoint rate limit. Principal identity is fixed at connect and periodically revalidated. Each event uses ordinary runtime resource permissions and timeout budgets; a connected socket does not grant generic project-administration capabilities.
+Three sentences on permissions and model:
+
+- Editing needs content-edit rights; publish/rollback needs publish rights;
+  the handshake applies the **published** authorizers, gates and endpoint
+  rate limits.
+- The principal is established at connect time and re-checked periodically;
+  events run under the runtime's resource permissions and timeouts — a
+  socket never grants project-management powers.
+- The console's Test opens the **real published socket**, not a draft test.
 
 ## Create, publish, connect
 
-Source-derived/unexecuted example: create `game/echo` first, with `def main(message): return message`.
+Source-derived, unexecuted. First create the script `game/echo`:
+`def main(message): return message`.
 
 ```http
 POST /projects/demo/endpoints
@@ -25,9 +39,14 @@ Content-Type: application/json
 {"segment":"play","ws_config":{"route_key":"type","routes":{"$default":{"script":"game/echo"}},"message_rate_limit":{"requests":20,"window_secs":10},"log_messages":"errors"},"allowed_authorizers":["password"]}
 ```
 
-Creation returns the normal endpoint view with `method:"GET"`, `path:"/play"`, `ws_config.routes.$default:{"script_id":"<uuid>","script":"game/echo"}`, null ordinary script/workflow bindings, and unpublished status. Read back the endpoint id and publish `POST …/endpoints/<id>/publish {}`. A non-upgrade GET returns **426**.
+Creation returns the ordinary endpoint view: `method:"GET"`, `path:"/play"`,
+`ws_config.routes.$default:{"script_id":"<uuid>","script":"game/echo"}`,
+null script/workflow bindings, not yet published. Save the id and
+`POST …/endpoints/<id>/publish {}`; a plain GET without upgrade answers
+**426**.
 
-Browsers cannot set Authorization on `WebSocket`; exchange a credential for a one-use ticket:
+Browsers cannot set an Authorization header on WebSocket, so exchange a
+one-time ticket:
 
 ```http
 POST /p/demo/_ws/ticket
@@ -39,38 +58,109 @@ Content-Type: application/json
 {"ticket":"<one-use-ticket>","expires_in":30}
 ```
 
-Connect within 30 seconds to `wss://api.example.invalid/p/demo/play?ticket=<ticket>`. Server-side/mini-program clients may instead set `Authorization: Bearer …` in the handshake. Never put the long-lived bearer in the URL. Send `{"type":"echo","id":1,"text":"hello"}`; `$default` receives and returns that object as one text frame. Console Test opens a **real published socket**, not an unpublished draft.
+Connect within 30 seconds via
+`wss://api.example.invalid/p/demo/play?ticket=<ticket>`. Server/mini-program
+clients can set the bearer directly in the handshake — **never put a
+long-lived token in the URL**. Sending
+`{"type":"echo","id":1,"text":"hello"}` hits `$default`, which replies with
+one text frame echoing it.
 
-## Complete `ws_config`
+## The full `ws_config`
 
-| Field | Default / validation |
+| Field | Default and validation |
 | --- | --- |
-| `routes` | Required route → `{script}` or `{script_id}` map; UUID wins when both are supplied. Every script must be in the project. At least one message route, not only lifecycle routes. |
-| Route names | `$connect`, `$disconnect`, `$default`, or 1–64 lowercase ASCII letters/digits/underscore. |
-| `route_key` | `"type"`; incoming object field containing a string route name. |
-| `message_rate_limit` | Optional `{requests,window_secs,burst?}`, positive values, burst defaults to requests; per connection. Over limit drops that message and sends an error. |
-| `log_messages` | `errors` default or `all`. Failures/lifecycle runs always logged; successful message logs and their lines omitted in errors mode. |
+| `routes` | Required; a route → `{script}` or `{script_id}` map, UUID winning when both are present; scripts must belong to this project; lifecycle-only routing is invalid — at least one message route is required. |
+| Route names | `$connect`, `$disconnect`, `$default`, or 1–64 lowercase ASCII letters/digits/underscores. |
+| `route_key` | Default `"type"`; the string field of the message object used for routing. |
+| `message_rate_limit` | Optional `{requests,window_secs,burst?}`, positive values, burst defaulting to requests; counted **per connection**; exceeding drops the message and returns an error frame. |
+| `log_messages` | Default `errors`, optionally `all`; failures and lifecycle always log; errors mode keeps no successful-message logs or lines. |
 
-`PUT …/endpoints/<id>/info {"ws_config":{…}}` replaces the whole config on a WebSocket target; absent/null does not clear it. Reads return script ids plus current names (null name if deleted); ids preserve bindings across renames. Config, route script source and eligible dependencies freeze on publish using script snapshot rules; edits need republishing. Rollback restores old route/script content. See [snapshots](../publishing/snapshots.md).
+`PUT …/endpoints/<id>/info {"ws_config":{…}}` **replaces wholesale** on a WS
+target (omitted/null does not clear). Reads return id and current name (null
+after the script is deleted — renaming loses no binding). Configuration,
+route-script source and eligible dependencies freeze at publish per the
+script snapshot rules; edits need a republish, and rollback restores the old
+content, see [snapshots](../publishing/snapshots.md).
 
-## Event and push contract
+## Events and the push contract
 
-`ctx.ws` carries `connection_id`, `event` (`connect|message|disconnect`), `route`, and disconnect `reason`. Message args are `{message:<object>}`; lifecycle events have no message argument. `$connect` sees handshake `ctx.request`; returning status >=400 or raising refuses upgrade. A push to itself during `$connect` is dropped because it is not open yet. Message input must be a JSON object text frame; unknown route uses `$default` or sends `unknown_route`. Return non-null JSON (or explicit response body) to reply; null sends no frame. Errors do not normally close the connection:
+`ctx.ws` carries `connection_id`, `event` (`connect|message|disconnect`) and
+`route`, plus `reason` on disconnect:
+
+- Message events receive `{message:<object>}`; lifecycle events carry no
+  message.
+- `$connect` may read the handshake `ctx.request`; returning ≥400 or throwing
+  **refuses the upgrade** — the connection does not exist yet, so pushing to
+  self is dropped.
+- Inbound messages must be **JSON object** text frames; unknown routes go to
+  `$default` or answer `unknown_route`. A non-null JSON return (or explicit
+  response body) sends one frame; null sends nothing.
+- Message-level errors usually **do not close the connection**; they answer
+  an error frame:
 
 ```json
 {"type":"error","error":"unknown_route","message":"…","id":1}
 ```
 
-Other frame codes include `bad_frame`, `rate_limited`, `overloaded` and ordinary runtime error codes. `$disconnect` runs after the current message finishes and cannot reply to the closed socket. Reasons include `client`, `server`, `idle`, `lifetime`, `revoked`, `overloaded`, `handshake_failed`, `instance_lost`.
+  Other codes: `bad_frame`, `rate_limited`, `overloaded` and runtime error
+  codes.
+- `$disconnect` runs after the current message completes and **cannot** reply
+  to the already-closed socket; reasons include `client`, `server`, `idle`,
+  `lifetime`, `revoked`, `overloaded`, `handshake_failed`, `instance_lost`.
 
-Project scripts can `ctx.ws.send(id,data)`, `close(id,1000|4000..4999,reason)`, `join(id,room)`, `leave`, `broadcast(room,data,exclude=[…])`, `members(room)`, `connections(user_id)`; TypeScript awaits them. Rooms are project-local 1–200-character strings. IDs from other projects are unknown. Send acceptance is **not client receipt**. Push is at-most-once, cross-instance, ordered from one script; reconnect must recover durable state. Rooms are cleaned after disconnect handling, allowing that handler to inspect prior membership.
+Push APIs available to project scripts: `ctx.ws.send(id,data)`,
+`close(id,1000|4000..4999,reason)`, `join(id,room)`, `leave`,
+`broadcast(room,data,exclude=[…])`, `members(room)`,
+`connections(user_id)` (await in TypeScript). A room is a 1–200 character
+string within the project; other projects' connection ids are invisible to
+it.
+
+> [!WARNING]
+> A successful `send` does **not** mean the client received it: pushes are
+> at-most-once, cross-instance capable, and ordered within one script's
+> calls; durable state must be recovered by your code after reconnect. Rooms
+> are cleaned once disconnect handling finishes — the handler can still read
+> the old membership while it runs.
 
 ## Ordering, limits and recovery
 
-One connection executes messages serially in arrival order, queue depth `VIAT_WS_QUEUE_DEPTH` default 32. Overflow refuses a message but leaves the socket open. Different connections execute concurrently: use database transactions/locks for shared state. No automatic message retry or idempotency ledger exists; put business ids in frames.
+- **Ordering**: one connection runs messages serially in arrival order, with
+  queue depth `VIAT_WS_QUEUE_DEPTH` defaulting to 32; overflow drops that
+  message but keeps the connection. Different connections run concurrently —
+  use database transactions/locks for shared state. There is no automatic
+  retry or idempotency ledger; put business ids in your frames.
+- **Limits**: default frame cap 64 KiB (`VIAT_WS_MAX_MESSAGE_BYTES`);
+  10,000 connections per instance (`VIAT_WS_MAX_CONNECTIONS`, excess gets
+  503 + `Retry-After`); maximum lifetime 86,400 seconds; identity re-checked
+  every 300 seconds. Token expiry alone does not disconnect — but user
+  deactivation, authorizer deletion, session revocation, role/admin changes
+  and API-key expiry/revocation disconnect with **4401** at recheck.
+- **Close codes**: ping every 30 seconds, two misses close with **1001**;
+  binary frames get **1003**; lifetime/idle use 1001; slow readers close
+  with **1008** after 256 pending frames or a blocked write; graceful
+  restart uses **1012** (refusing new connections and running disconnect
+  cleanup within a deadline). After an instance is unreachable for 90
+  seconds, surviving instances run one disconnect for stranded connections;
+  a recovered old instance closes its reclaimed connections and processes
+  nothing twice.
+- **Proxies and recovery**: reverse proxies must forward
+  Upgrade/Connection with a long enough read timeout; use WSS and the client
+  platform's socket-domain allowlists. Reconnecting produces a new
+  connection id — **never** expect missed pushes to be replayed.
+- **Verify and clean up**: [fixtures](../testing/fixtures.md) can verify
+  handler decisions; real transport still needs explicitly authorized socket
+  testing. Unpublishing stops new handshakes and revokes no past event side
+  effects; close test sockets, clean rooms via those closes, then delete the
+  isolated endpoint/scripts.
 
-Defaults: max frame 64 KiB (`VIAT_WS_MAX_MESSAGE_BYTES`), per-instance connections 10000 (`VIAT_WS_MAX_CONNECTIONS`, excess 503 + Retry-After), lifetime 86400 seconds, revalidation every 300 seconds. Token expiry alone does not close a connection; user deactivation, authorizer removal, session revocation, role/admin changes or API-key expiry/revocation can close it at revalidation (**4401**). The server pings every 30 seconds; two silent intervals close **1001**. Binary frames close **1003**; lifetime/idle close 1001; slow readers may close **1008** (256 queued outbound frames or blocked writes). Graceful restart uses **1012**, refuses new connections and allows bounded disconnect cleanup. After a dead instance's heartbeat is absent for 90 seconds a survivor runs stranded disconnect cleanup once; a recovered old holder closes reaped sockets without repeating it.
+Repository side: `endpoints/play.get.yaml` uses
+`target:{kind:websocket,routes:{…}}`, synced via `viat pull/push` and
+published with the endpoint/project CLI.
 
-Proxy/load balancer must forward Upgrade/Connection and allow sufficiently long read timeouts; use WSS and the client platform's domain allowlist. Reconnect creates a new id; recover state from durable storage, never rely on delivery during a gap. Verify with [fixtures](../testing/fixtures.md) for handler decisions and an explicitly authorized real socket test for transport. Unpublish to stop new handshakes; do not assume it cancels all existing event side effects. Close test sockets, remove rooms through closure, then remove isolated endpoints/scripts.
+## Verification basis
 
-Repo: `endpoints/play.get.yaml` with `target:{kind:websocket,routes:{…}}`; sync using `viat pull/push`, publish through endpoint/project CLI. Source evidence: `crates/viat-core/src/types/websocket.rs`; `crates/viat-api/src/handlers/endpoints.rs`, `handlers/snapshots.rs`, WebSocket dispatch/session modules and tests; `crates/viat-cli/src/repo/endpoints.rs`. No transport/provider calls were executed for this page.
+Contract source `03751a67`: `crates/viat-core/src/types/websocket.rs`;
+`crates/viat-api/src/handlers/endpoints.rs`, `handlers/snapshots.rs`, the
+WebSocket dispatch/session modules and tests;
+`crates/viat-cli/src/repo/endpoints.rs`. No transport or provider calls were
+executed for this page.

@@ -299,7 +299,7 @@ viat resource test demo_config
 
 **Failure handling, verification and cleanup.** Do not run without upstream opt-in. Check credentials/schema and warnings, not just exit 0. No provider rollback is promised; this is not a script run or a notification delivery guarantee.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

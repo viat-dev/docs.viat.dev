@@ -9,29 +9,59 @@ contract_ids: []
 
 # Multi-factor authentication
 
-Viat supports TOTP authenticators and one-use recovery codes for **password** doors. Platform and project users have separate factors, policies and tickets. Provider OIDC/social login relies on the upstream provider's assurance; Viat does not add a second password-factor challenge to every bearer request. API keys, PATs and refresh operations are not interactive TOTP logins. MFA is not an authorization-rule grant.
+Viat provides TOTP authenticators and one-use recovery codes for
+**password** entrances. Platform and project users keep separate factors,
+policies and tickets. Boundaries first:
 
-## Policies and prerequisites
+- OIDC/social login relies on the upstream identity's assurance — Viat
+  **never** adds a password second-factor challenge to every bearer
+  request; API keys, PATs and refresh operations are not interactive TOTP
+  logins.
+- MFA is **not** an authorization-rule grant.
 
-Use HTTPS, a password-capable account, a trusted authenticator, correct server/device clocks and secure offline recovery-code storage. Never publish a TOTP QR/secret, recovery code or MFA ticket. Keep another platform Owner recovery path before enforcing policy.
+## Policy and prerequisites
 
-- Platform `VIAT_MFA_REQUIRED`: `off` (default; enrollment still available), `admins` (Owner/Admin), `all`; true maps to all, false to off. It applies platform roles, not project membership roles. Unknown policy text parses off, so use the documented literal and verify status.
-- Project `mfa_policy`: `off` default, `optional`, `required`; Owner/Admin changes it through project settings. `off` ignores enrolled project rows and refuses project self-service; `optional` asks enrolled password users; `required` forces unenrolled password users through enrollment. Changing to off does not prove secrets were erased.
-- A platform account that has only external SSO and no password reports `available:false`; do not try to enroll by inventing a local password.
+Use HTTPS, an account with a password, a trusted authenticator, correct
+server/device clocks and safe offline recovery-code storage. **Never**
+publish TOTP QR codes/secrets, recovery codes or MFA tickets; before
+mandating a policy, keep another platform-Owner recovery channel.
+
+- Platform `VIAT_MFA_REQUIRED`: default `off` (voluntary enrollment still
+  works), `admins` (Owner/Admin) or `all`; `true` maps to all and `false`
+  to off. It checks **platform roles**, not project membership. **Unknown
+  strings parse as off** — use explicit values and verify the state.
+- Project `mfa_policy` (`off`/`optional`/`required`, changed by the
+  project Owner/Admin in settings): `off` ignores enrolled project
+  factors and refuses self-service routes; `optional` asks enrolled
+  password users; `required` forces unenrolled password users through
+  enrollment. Switching back to off **does not delete** the secret.
+- Platform SSO-only passwordless accounts report `available:false` — do
+  not invent a local password to enroll.
 
 ## Password login is a two-step protocol
 
-Correct password can return **401**, not 200:
+A correct password can still answer **401** instead of 200:
 
 ```json
 {"error":"mfa_required","message":"...","mfa_ticket":"11111111-2222-4333-8444-555555555555","expires_at":"2026-11-06T12:05:00Z"}
 ```
 
-The code may instead be `mfa_enrollment_required`. This is a challenge, not a rejected password. The ticket is valid for 300 seconds and at most five code attempts; it is scoped to account, purpose and identity plane. Per-account throttling also applies. Use the actual ticket from the response, never the illustrative UUID. A login ticket cannot be used as a bearer or as an enrollment ticket.
+It may also be `mfa_enrollment_required`. **This is a challenge, not a
+wrong password.** Tickets live 300 seconds with at most five code
+attempts, bound to account, purpose and identity plane, plus per-account
+rate limiting. Use the ticket from your actual response — never the
+illustration UUID; a login ticket is not a bearer and cannot impersonate
+an enrollment ticket.
 
-For enrolled platform users, `POST /auth/mfa/verify` takes required `mfa_ticket` and `code`; success returns the normal platform login response (access/refresh pair, identity and overview token). Project users use `POST /p/{slug}/auth/mfa/verify` with the same two required keys; native login completion returns its project login/session result, not a platform account. Hosted project login handles this navigation in its own forms.
+- An enrolled **platform** user calls `POST /auth/mfa/verify` (requires
+  `mfa_ticket`, `code`); success returns the ordinary platform login
+  response (access/refresh, identity, overview token).
+- A **project** user calls `POST /p/{slug}/auth/mfa/verify` (same
+  required keys); the native completion returns the project login/session
+  result — **not** a platform account. Project-hosted login pages handle
+  the navigation inside their form.
 
-Source-derived **unexecuted** platform request:
+Source-derived, unexecuted platform request:
 
 ```sh
 curl -sS "$BASE/auth/mfa/verify" -H 'Content-Type: application/json' \
@@ -43,40 +73,93 @@ curl -sS "$BASE/auth/mfa/verify" -H 'Content-Type: application/json' \
 | Action | Platform route | Project route |
 | --- | --- | --- |
 | Status | `GET /auth/mfa` | `GET /p/{slug}/auth/mfa` |
-| Begin enrollment | `POST /auth/mfa/totp/setup` | `POST /p/{slug}/auth/mfa/totp/setup` |
+| Start enrollment | `POST /auth/mfa/totp/setup` | `POST /p/{slug}/auth/mfa/totp/setup` |
 | Confirm | `POST /auth/mfa/totp/confirm` | `POST /p/{slug}/auth/mfa/totp/confirm` |
 | Disable | `DELETE /auth/mfa` | `DELETE /p/{slug}/auth/mfa` |
-| Replace recovery set | `POST /auth/mfa/recovery-codes` | `POST /p/{slug}/auth/mfa/recovery-codes` |
+| Replace recovery codes | `POST /auth/mfa/recovery-codes` | `POST /p/{slug}/auth/mfa/recovery-codes` |
 
-Platform self-service requires an interactive platform session, not a PAT. Project self-service requires the appropriate active project password-login identity and non-off policy, not a platform session or machine key.
+Platform self-service requires an **interactive platform session** (no
+PATs); project self-service requires a valid matching project
+password-login identity with policy not off (no platform sessions, no
+machine keys).
 
-1. Setup from a signed-in platform session takes `{"password":"..."}`. Project setup uses **`{"credential":"..."}`**. Alternatively, forced-enrollment setup uses `{mfa_ticket}` without a completed session; the enrollment ticket already represents a password check. Optional ticket/password keys may be omitted/null when not applicable.
-2. Setup returns exactly `{secret,otpauth_uri,issuer,account}`. `secret` is base32; `otpauth_uri` can be imported by an authenticator. This is pending enrollment, not enforced MFA. Starting again can replace an unconfirmed secret.
-3. Confirm takes required `code`, optional/null `mfa_ticket`. Platform confirm returns `{recovery_codes,session?}`; `session` is included when enrollment was the login's missing step, omitted for an already signed-in enrollment. Project confirm similarly completes the corresponding project login door; it is not a platform session.
-4. Save recovery codes once in offline secure storage before dismissing the result. The server retains hashes; status cannot recover the strings.
-5. Verify status and a fresh login, including the challenge branch. Do not keep retrying a spent TOTP step; replay protection rejects reuse.
+1. A logged-in platform setup sends `{"password":"..."}`; a project setup
+   uses **`{"credential":"..."}`**. The forced-enrollment branch may also
+   send `{mfa_ticket}` without a session — an enrollment ticket proves
+   the password check just passed. Inapplicable optional
+   ticket/password keys may be omitted/null.
+2. Setup returns exactly `{secret,otpauth_uri,issuer,account}`: `secret`
+   is base32 and `otpauth_uri` imports into authenticators. This state is
+   only **pending** — an unconfirmed secret can be regenerated.
+3. Confirm requires `code` with optional/null `mfa_ticket`. The platform
+   answers `{recovery_codes,session?}` — `session` appears only when
+   enrollment was the login's missing step; logged-in enrollment omits
+   it. A project confirm completes that project's login entrance and
+   returns **no** platform session.
+4. Before dismissing the display, store the **once-shown** recovery codes
+   offline; the server keeps hashes only and status endpoints recover no
+   strings.
+5. Verify the status and log in again to exercise the challenge branch;
+   never reuse a consumed TOTP time step — replay protection rejects it.
 
-Status shared fields: `enabled`, `pending`, nullable `confirmed_at`, `recovery_codes_remaining`, nullable `last_used_step`. Platform adds `required`, `available`; project adds `policy`, `required`. A replay watermark ahead of the current time step can indicate clock rollback or restored state, not a mistyped code. Check server time and restore history before resetting accounts.
+Shared status fields: `enabled`, `pending`, nullable `confirmed_at`,
+`recovery_codes_remaining`, nullable `last_used_step`; the platform adds
+`required`/`available`, the project adds `policy`/`required`. A replay
+watermark above the current step suggests clock rollback/restored state
+rather than user error — check server time and recovery records first.
 
-Disable/replace recovery set requires reauthentication: platform `{password,code}`, project **`{credential,code}`**, both required. `code` can be a current TOTP or unused recovery code. Disable returns `{ok:true}` and removes factor/recovery state. It is allowed even when policy requires MFA, so users can move authenticators; next password login will require enrollment again. Recovery replacement returns `{recovery_codes:[...]}` and immediately invalidates the previous set.
+Disabling/replacing recovery codes re-authenticates: platform
+`{password,code}`, project **`{credential,code}`**, both required; `code`
+may be the current TOTP or an unused recovery code. Disable answers
+`{ok:true}` and clears factor/codes — allowed even under a required
+policy (device changes), with re-enrollment demanded at the next password
+login. Recovery-code replacement answers `{recovery_codes:[...]}` and
+**immediately invalidates** the old set.
 
 ## Loss, reset and sessions
 
-Lost authenticator but have a recovery code: use one at the login's verify step, then disable/re-enroll or regenerate the recovery set after reauthentication. Recovery codes are consumed once, not reusable spare passwords. Do not send them to an administrator in chat.
+- Lost authenticator with recovery codes: use one at the login verify
+  step, then re-authenticate to disable/re-enroll or regenerate codes.
+  Recovery codes are **single-use**, not reusable spare passwords — never
+  send them to an administrator.
+- Both lost: confirm identity out-of-band first, then use the **correct
+  management plane**:
 
-Lost both: verify the person's identity out of band, then use the correct administration plane:
+| Plane | Action | Rights and effect |
+| --- | --- | --- |
+| Platform | `DELETE /users/{email}/mfa` | **Platform Owner with an interactive session only** (an Owner PAT does not work); answers `{ok,had_mfa,sessions_revoked}`, clears the factor and revokes platform refresh sessions and overview readers — **not** a statement that every PAT is revoked |
+| Project | `DELETE /projects/{slug}/users/{identity}/mfa` | Project editors (`owner`/`admin`/`developer`); answers `{ok,had_mfa}`; clears project MFA but this handler revokes **no** project login/refresh sessions and bumps no password epoch — on suspected compromise, deactivate the user/change the password and inventory keys/sessions; never promise session revocation based on the old "project tokens are stateless" comments |
 
-- Platform `DELETE /users/{email}/mfa`: **platform Owner and session only**; an Owner PAT is rejected. Returns `{ok,had_mfa,sessions_revoked}`; clears factor and revokes platform refresh sessions and overview readers. It does not say all PATs were revoked.
-- Project `DELETE /projects/{slug}/users/{identity}/mfa`: project editor (`owner`, `admin`, `developer`). Returns `{ok,had_mfa}`. It clears project MFA, but does **not** revoke project login/refresh sessions or bump the password epoch in this handler. If compromise rather than simple loss is possible, separately deactivate the user/change password and review keys/sessions; do not rely on the old “stateless project tokens” comment as a session-revocation guarantee.
-
-Password changes are separate: platform `PUT /auth/password` uses `{old_password,new_password,code?}`; project `POST /p/{slug}/auth/password` uses `{current,new,code?}`. Existing MFA requires code when applicable. Removing a factor is not changing the password.
+Password change is a different operation: platform
+`PUT /auth/password` with `{old_password,new_password,code?}`; project
+`POST /p/{slug}/auth/password` with `{current,new,code?}`; enrolled MFA
+requires `code` where applicable. **Removing the factor is not changing
+the password.**
 
 ## Failure handling and verification
 
-Expired/exhausted/wrong-purpose ticket or wrong factor can yield `401`; unavailable/policy-off and malformed requests fail rather than creating a factor; throttling returns `429`/`Retry-After`. Restart from password login after an expired ticket. For pending enrollment attempt exhaustion, repeat legitimate setup rather than brute-force confirm. Never log ticket/code/secret bodies during diagnosis.
+- Expired/exhausted/wrong-purpose tickets or wrong factors answer `401`;
+  unavailable/policy-off and malformed requests fail rather than create
+  factors; rate limiting is `429`/`Retry-After`. Ticket expired → restart
+  from the password login; pending attempts exhausted → a fresh lawful
+  setup, **never brute-force confirms**. Do not log ticket/code/secret
+  request bodies while troubleshooting.
+- Denial checks: a project ticket must not verify on the platform or
+  another project; a PAT must not drive platform setup/reset; a machine
+  key must not change passwords; old recovery codes must fail after
+  regeneration; under a required policy an unenrolled login must not
+  obtain a session before confirm. Use isolated accounts and restore the
+  intended policy; administrator resets of real accounts need the
+  operator's explicit approval.
+- The console's account-security page implements password → setup →
+  confirm → the one-time recovery-code display; the session inventory is
+  a separate page. This page executed no authenticator enrollment, real
+  SSO, provider calls or account resets.
 
-Negative checks: a project ticket must fail at platform verify and another project's verify; a PAT must fail platform setup/reset; a machine key must not change a password; an old recovery set must fail after regeneration; unenrolled required-policy login must not get a normal session before confirmation. Use disposable accounts and restore their intended MFA policy afterward; administrator resets affect real account security and require explicit operator approval.
+## Verification basis
 
-The console Account Security page implements password → setup → confirm → one-time recovery display; Sessions is a separate inventory. This reference did not execute authenticator enrollment, real SSO, provider calls or account resets.
-
-**Evidence:** `crates/viat-api/src/{mfa_engine.rs,handlers/mfa.rs,handlers/project_mfa.rs,handlers/users.rs,handlers/project_users.rs,auth_native.rs}`, `web/src/pages/settings/{SecurityPage.tsx,EnrolForm.tsx,RecoveryCodes.tsx,SessionsPage.tsx}`. The project-reset/session discrepancy above is derived from the actual handler, not archived plans.
+Contract source `03751a67`:
+`crates/viat-api/src/{mfa_engine.rs,handlers/mfa.rs,handlers/project_mfa.rs,handlers/users.rs,handlers/project_users.rs,auth_native.rs}`,
+`web/src/pages/settings/{SecurityPage.tsx,EnrolForm.tsx,RecoveryCodes.tsx,SessionsPage.tsx}`.
+The project reset/session differences above come from the actual
+handlers, not from old plans.

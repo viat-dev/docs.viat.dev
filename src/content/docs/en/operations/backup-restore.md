@@ -8,29 +8,45 @@ channel: stable
 
 # Back up and validate an isolated restore
 
-**Every command on this page is an unexecuted operational template. Nothing was backed up, stopped, restored or contacted while writing it.** Backup/restore changes require deployment/database administrator permission, data-owner approval and a maintenance window. Do not paste these commands into production without adapting service names, PostgreSQL version, role, paths and recovery objectives.
+**Every command on this page is an unexecuted operational template — nothing
+was stopped, backed up, restored or contacted while writing it.** The work
+needs deployment/database-administrator permission, data-owner approval and
+a maintenance window; adapt service names, PostgreSQL version, roles, paths
+and recovery targets before use — **never paste into production**.
 
-A `viat pull` or source repository is **not an instance backup**: it does not include account/session state, all resource secrets, live business data, run history, external bytes or complete configuration. There is no built-in one-command disaster-recovery/HA guarantee.
+One fact to anchor on: `viat pull` or a source repository **is not an
+instance backup** — it contains neither complete accounts/sessions nor all
+resource secrets, business data, run history, external files or deployment
+configuration. There is no one-command disaster-recovery/HA guarantee.
 
-## Inventory the recovery set
+## The recovery-set checklist
 
-| Item | Capture | Why it matters |
+| Item | Back up | Why |
 | --- | --- | --- |
-| Platform PostgreSQL | Consistent database backup, required roles/grants/extensions and server version; optionally a separately managed PITR/WAL solution | All platform state, ciphertext/references, snapshots, queue and audit |
-| Original master key | Restricted independent secret backup and tested retrieval | Database dump alone cannot decrypt AES secrets |
-| JWT/config/license | Restricted deployment environment, service files, image digest, valid activation arrangement, TLS/key recovery policy | Recreating a container does not recover missing configuration; license must still be valid |
-| Vault/AWS Secrets Manager | Provider-supported backup/version/recovery, historical names/paths/mounts and read credentials | Database only holds references; changing write backend does not migrate history |
-| Business databases | Provider-consistent dump/snapshot including audit triggers/table, file metadata, migration ledger | Separate from platform database; coordinate a consistent business recovery point |
-| Local files/SQLite | Consistent files and ownership/modes; SQLite backup/checkpoint discipline including WAL if applicable | A live partial file copy is not necessarily a valid database |
-| S3/storage/artifacts | Object versions, bucket configuration and lifecycle; required executable artifacts | Byte data is not in platform SQL; artifact compatibility depends on release/target |
-| Dependency/build caches | Optional online; potentially essential offline | Rebuild requires available sources/toolchains and time |
-| Remote logs/exports | Independent backend backup/retention and evidence controls | Platform dump does not contain new ClickHouse/Loki lines |
+| Platform PostgreSQL | Consistent backup, required roles/grants/extensions, version; optionally managed PITR/WAL | Platform state, ciphertext/references, snapshots, queues, audit |
+| **Original master key** | Separate restricted secret backup, retrieval rehearsed | A SQL dump alone **cannot decrypt AES** |
+| JWT/config/license | Restricted environment, service files, image digests, valid activation arrangements, TLS/private-key recovery policy | Recreating containers restores no missing config; the license must stay valid |
+| Vault/AWS Secrets Manager | Provider-supported backup/version recovery; historical names/paths/mounts and read identities | The database stores references; switching write backends migrates no history |
+| Business databases | Consistent backups including audit tables/triggers, file metadata, migration ledgers | Not in the platform database; business recovery points must align |
+| Local files/SQLite | Files, ownership, permissions; proper SQLite backup/checkpoint plus necessary WAL | A partial online copy is not necessarily a consistent database |
+| S3/storage/artifacts | Object versions, bucket config/lifecycle, required executable artifacts | Bytes are not in platform SQL; artifact compatibility depends on version/target |
+| Dependency/build caches | Rebuildable online, possibly required offline | Rebuilds need available sources, toolchains and time |
+| Remote logs/exports | Independent backend backups/retention and evidence control | A platform dump contains no new ClickHouse/Loki rows |
 
-Define RPO/RTO with measured restore times and business requirements, not an invented product guarantee. Encrypt backups, keep keys separately, restrict operator access, retain off-host copies and test their readability. Never put filled deployment `.env` files or database dumps in source control.
+Define RPO/RTO from **measured recovery durations** and business needs — no
+invented product guarantees. Encrypt backups, store keys separately,
+restrict access, keep off-site copies and verify readability; completed
+`.env` files and dumps **never enter version control**.
 
-## Example platform backup with Compose
+## Compose platform backup example
 
-This example assumes the installation guide's `viat` and `postgres` services, PostgreSQL role/database `viat`, working directory at your approved Compose project, and matching tools already present. Stop **all Viat replicas and external writers** that share the recovery set if you need one consistent cross-store point. Disable inbound traffic/producers under your change plan; let supported in-flight work drain. PostgreSQL `pg_dump` itself is consistent while online, but it cannot make multiple stores atomically consistent.
+Assumptions: the install guide's viat/postgres services, the viat
+database/role, an approved Compose project directory, matching installed
+tools. For a cross-store consistent recovery point, **stop every Viat
+replica and external writer sharing the recovery set**; close entry
+points/producers per the change plan and allow supported task draining.
+pg_dump is online-consistent by itself but **cannot** make multiple stores
+atomically consistent.
 
 ```sh
 umask 077
@@ -46,21 +62,39 @@ sha256sum backups/recovery-point/platform.dump \
   > backups/recovery-point/backup.sha256
 ```
 
-A failed dump can leave an incomplete output file: inspect the command exit status, size and archive table of contents; a filename/hash alone is not proof of completeness. `pg_dumpall --globals-only` needs appropriate privileges and may contain role password hashes; protect it like credentials. With a managed DB, use its approved role/export mechanism instead of assuming superuser.
-
-While writers remain quiesced, capture each external store using its supported consistency procedure; record matching timestamps/IDs, deployment files and image digest, then resume the original application only after those captures finish:
+- A failed command can leave partial files: check exit codes, sizes and the
+  archive directory — **a filename/hash alone proves no completeness**.
+- `pg_dumpall` globals need adequate permissions and can contain password
+  hashes: protect them like credentials. Managed databases use approved
+  roles/export mechanisms; never assume superuser.
+- While writers stay quiet, capture external state per each store's
+  supported method, recording matching times/ids, configuration and image
+  digests; afterwards bring the application back:
 
 ```sh
 docker compose start viat
 ```
 
-Do not copy the raw running PostgreSQL data directory with ordinary `tar`. Use logical backup as above or a PostgreSQL-aware physical/PITR solution. For ordinary local-file trees, snapshot/copy the stopped tree with ownership/modes preserved and record content hashes. For SQLite, use its online backup API or a quiesced consistent copy; do not silently omit WAL data. An S3 copy needs versions and a proven relationship to file metadata; “bucket exists” is insufficient.
+- **Never copy a running PostgreSQL data directory with plain tar** — use
+  the logical backup above or PostgreSQL-aware physical/PITR. Ordinary
+  files may be snapshotted with ownership/permissions once writes stop,
+  with hashes recorded; SQLite needs the online backup API or a quiet
+  consistent copy (WAL included); S3 copies must include versions and
+  correspond to file metadata — "the bucket exists" is not enough.
 
-## Restore only on an isolated recovery host first
+## Rehearse on an isolated recovery host first
 
-Use a dedicated recovery host/VM with **no route or credentials capable of reaching production providers/databases**, no production-mounted directories, and no public listener. A Docker `--internal` network is useful defense-in-depth, not a universal firewall against every host/network path. Verify isolation before starting the restored application: cloned queue rows, schedules, alerts and chat connectors can act automatically. `SCHEDULER_ENABLED=false` disables only cron, not all side effects.
+Requirements: a dedicated host/VM with **no network path or credentials to
+production providers/databases**, no production mounts, no public
+listeners. A Docker `--internal` network is defense in depth, not a
+universal firewall. **Prove isolation before starting the restored app**:
+cloned queues, schedules, alerts and chat connectors can act on their own;
+`SCHEDULER_ENABLED=false` stops only cron.
 
-Prepare a new empty working directory, copies of the trusted backup artifacts and the **already available approved** PostgreSQL/application images. Do not use production service/container/volume names. These commands intentionally use `--pull=never` and no published ports:
+Prepare a fresh empty directory, trusted backup copies and **already
+present, approved** PostgreSQL/application images; use no production
+containers/volumes/service names; the commands below use explicit
+`--pull=never` and publish no ports:
 
 ```sh
 sha256sum -c backups/recovery-point/backup.sha256
@@ -75,7 +109,13 @@ docker run -d --pull=never --name viat-restore-db \
 docker exec viat-restore-db pg_isready -U viat -d viat
 ```
 
-The `trust` authentication above is **only for the disposable, nonpublished isolated drill**, never a production configuration. Do not continue until `pg_isready` succeeds; it may need to be repeated after startup. Use a matching PostgreSQL major/tool version or a separately tested migration path. Inspect globals and recreate only required safe roles/grants; never replay unreviewed superuser/role changes into a shared cluster.
+- The `trust` auth here is **for a one-off, port-unpublished isolated drill
+  only — never a production setting**. Proceed only after `pg_isready`
+  succeeds (it may need a rerun during startup).
+- Use matching PostgreSQL major versions/tools or a separately validated
+  upgrade path; review the globals and restore only required security
+  roles/grants — **never** replay unreviewed superuser changes onto a
+  shared cluster.
 
 ```sh
 docker exec -i viat-restore-db pg_restore \
@@ -86,11 +126,17 @@ docker exec viat-restore-db psql -U viat -d viat -v ON_ERROR_STOP=1 \
   -c 'SELECT count(*) AS users FROM platform_users;'
 ```
 
-`--no-owner --no-privileges` deliberately avoids restoring original ownership/ACLs into this minimal drill; it is not proof a production restore has correct ACLs. Review/reapply approved ownership/permissions for the real target. Do not use `--clean` against an existing database as a shortcut.
+The drill's no-owner/no-privileges **deliberately skips** original
+ACLs/ownership — it **cannot prove production permissions restored**; a
+real recovery reviews and rebuilds approved permissions. Never use
+`--clean` against an existing database for convenience.
 
-## Validate application, secrets and bytes
+## Verify application, secrets and files
 
-In a private editor create `recovery.env` with mode 0600 containing the following **reviewed fixture configuration**, plus any read backends needed by the restored secrets. Preserve the original master key; use a new drill-only JWT secret and a drill-specific public URL:
+Create `recovery.env` (mode 0600) in a trusted editor with **reviewed
+fixture configuration** and the necessary historical secret-read backends.
+Keep the original master key; use a drill-only independent random JWT; a
+drill public URL:
 
 ```dotenv
 DATABASE_URL=postgres://viat@viat-restore-db:5432/viat
@@ -104,7 +150,13 @@ VIAT_RETENTION_ENABLED=false
 VIAT_UI_ENABLED=false
 ```
 
-These switches **do not disable all automation**. The host isolation is mandatory. A restored stored activation can still be valid and allow background work; do not rely on license lock as a safety mechanism. Do not copy live Vault/AWS credentials just to make the drill green; restore provider fixtures/read-only copies in the isolated environment where possible, otherwise mark that recovery dependency unvalidated.
+> [!WARNING]
+> These switches **do not disable all automation** — host-level isolation
+  is mandatory. The restored activation can still be valid and background
+  jobs can still run; **license lockout is not a safety measure**. And do
+  not copy live Vault/AWS credentials just to make things look normal:
+  prefer restoring provider fixtures/read-only replicas inside the isolated
+  environment, or record the item explicitly as unverified.
 
 ```sh
 docker run -d --pull=never --name viat-restore \
@@ -118,18 +170,29 @@ docker exec viat-restore curl --fail --silent --show-error \
   http://127.0.0.1:8080/readyz
 ```
 
-Start the **same release** before considering an upgrade: startup applies its bundled migrations. The example omits file/artifact mounts on purpose; add restored **copies only** at required container paths and verify ownership. Restore checks must include:
+Start the **same version** first; consider upgrades afterwards (startup
+runs its built-in migrations). The example deliberately mounts no
+files/artifacts — mount only **restored copies** where needed and verify
+ownership. Validation must include at least:
 
-- Expected project/user/snapshot counts and known saved objects; successful approved login with correct role and valid activation.
-- One harmless fixture secret actually decrypted through the restored backend; probes alone do not test the master key.
-- One restored file with expected content hash and one business record/audit link; database import alone does not test byte recovery.
-- Compatible Rust artifact availability or a proven offline rebuild path; dependencies/build cache accessibility.
-- Explicit inventory of queued/running jobs and revoked sessions/PATs that an older backup can resurrect. Do not replay production actions as validation.
-- A written list of every untested external provider/backend and the measured restore duration. Never label a partially validated restore “complete”.
+- Project/user/snapshot counts and known objects; approved sign-in with
+  correct roles and valid activation.
+- **Actually decrypting one harmless fixture secret** through the restored
+  backends — probes never validate the master key.
+- One file's expected hash and its business-record/audit correlation — a
+  SQL import proves no byte-level file recovery.
+- Compatible Rust artifacts or a proven offline rebuild path;
+  dependencies/caches reachable.
+- An inventory of queued/running tasks and revoked sessions/PATs an old
+  backup can resurrect; **never replay production side effects as a
+  test**.
+- Records of every untested external provider/backend and the recovery
+  duration — **a partial recovery is not "complete"**.
 
-## Cleanup and actual disaster cutover
+## Cleanup and the real switchover
 
-After approved evidence capture, remove **only the drill-named** containers/network/volume. The last command destroys the drill database; verify its name first:
+After preserving evidence with approval, clean up **drill-only names
+only**; the last command destroys the drill database — confirm names first:
 
 ```sh
 docker rm -f viat-restore viat-restore-db
@@ -137,4 +200,10 @@ docker network rm viat-restore-net
 docker volume rm viat-restore-pg
 ```
 
-Securely handle `recovery.env`, dumps and exports under backup policy; deleting a file is not guaranteed secure erasure on every storage system. For a real recovery, fence the failed/old writers, restore approved production ownership and secret access, reconcile replay risk/credentials, then re-enable ingress and automation in controlled stages. Never run old and restored producers concurrently against the same business targets without an explicit reconciliation plan. See [upgrades](upgrades.md) and [run recovery](runs.md).
+Dispose of `recovery.env`/dumps/exports per backup policy — deleting files
+guarantees no secure erasure on every storage. A real recovery: isolate old
+writers first → restore approved production permissions and secret reads →
+reconcile replay risks/credentials → reopen entry points and automation in
+stages. **Without an explicit reconciliation plan, the old and restored
+instances must never touch the same business targets simultaneously.** See
+[upgrades](upgrades.md) and [run recovery](runs.md).

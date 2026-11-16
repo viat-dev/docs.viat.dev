@@ -4,6 +4,8 @@ import starlight from '@astrojs/starlight';
 import { unified } from '@astrojs/markdown-remark';
 import { sidebar } from './scripts/lib/navigation.mjs';
 import { remarkDocumentationLinks } from './scripts/lib/markdown.mjs';
+import { remarkViatTabs } from './scripts/lib/tabs-remark.mjs';
+import { remarkHideVerificationBasis } from './scripts/lib/hide-basis.mjs';
 import { SITE_ORIGIN, BASE_PATH } from './scripts/lib/site.mjs';
 
 const manifest = JSON.parse(readFileSync(new URL('./contracts/manifest.json', import.meta.url), 'utf8'));
@@ -14,7 +16,7 @@ export default defineConfig({
   output: 'static',
   trailingSlash: 'always',
   markdown: {
-    processor: unified({ remarkPlugins: [remarkDocumentationLinks] }),
+    processor: unified({ remarkPlugins: [remarkDocumentationLinks, remarkViatTabs, remarkHideVerificationBasis] }),
   },
   integrations: [starlight({
     title: 'Viat',

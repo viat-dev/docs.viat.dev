@@ -153,6 +153,8 @@ CHECK_ENDPOINT_ID 只能是记录的自有诊断叶子；若曾明确发布，�
 
 ## 证据与剩余人工前提
 
-固定版本产品证据：`crates/viat-cli/src/repo/{im,endpoints}.rs`、`crates/viat-api/src/im/{dispatch,connector/weixin}.rs`、`handlers/{im,im_identities}.rs`、`crates/viat-api/src/lib.rs` 注册路由和 Python 主体/资源投影。[仓库同步](../projects/repo-sync.md)说明镜像语义。
+[仓库同步](../projects/repo-sync.md)说明镜像语义。仍需准备并人工验证：真实准入账户、当前绑定政策与同意、获准主机、实际 QR/poll 确认、项目用户登录绑定、核实的发送者映射、新鲜会话许可、真实私聊路由/回复观测，以及获得授权后的撤销 token 重新认证实验。离线夹具不宣称覆盖供应商/群聊/永久认证。
 
-仍需准备并人工验证：真实准入账户、当前绑定政策与同意、获准主机、实际 QR/poll 确认、项目用户登录绑定、核实的发送者映射、新鲜会话许可、真实私聊路由/回复观测，以及获得授权后的撤销 token 重新认证实验。离线夹具不宣称覆盖供应商/群聊/永久认证。
+## 核验依据
+
+固定版本产品证据：`crates/viat-cli/src/repo/{im,endpoints}.rs`、`crates/viat-api/src/im/{dispatch,connector/weixin}.rs`、`handlers/{im,im_identities}.rs`、`crates/viat-api/src/lib.rs` 注册路由和 Python 主体/资源投影。

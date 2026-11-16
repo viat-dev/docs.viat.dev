@@ -100,6 +100,6 @@ Changes live snapshots, not an undo of database mutations, notifications or all 
 
 Verification is observational: inspect the documented result fields and use the corresponding read tools before and after any authorized mutation. Do not verify by sending production traffic or deleting unrelated objects.
 
-## Maintenance evidence
+## Verification basis
 
 Input inventory: `contracts/1.1.0/mcp-tools.json`, tool `publish_rollback`. Implementation/tests under the pinned product source: `publish.rs; handlers/publish.rs; tests/it/tool_publish.rs`. Tool module filenames refer to `crates/viat-mcp/src/tools/`; API handlers refer to `crates/viat-api/src/handlers/`. Shared transport/error evidence: `crates/viat-mcp/src/tools/service.rs`, `http.rs`, `error.rs`; tests were inspected, not run for this documentation change.

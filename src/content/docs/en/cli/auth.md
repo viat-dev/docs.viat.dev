@@ -193,7 +193,7 @@ viat auth whoami
 
 **Failure handling, verification and cleanup.** Expired unrefreshable login exits 1: log in again, then repeat. No project changes or cleanup.
 
-## Implementation evidence
+## Verification basis
 
 Grammar comes from the pinned Clap contract and main.rs; behavior/permissions were checked against these files. Paths are relative to the product repository root.
 

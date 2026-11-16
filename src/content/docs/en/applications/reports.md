@@ -190,4 +190,8 @@ Use the actual row UUID from creation stderr or `viat apikey list case_machine`,
 
 ## Evidence and unverified boundaries
 
-See [SMTP](../assets/resources/smtp.md), [SQLite](../assets/resources/sqlite.md), [workflows](../assets/workflows/overview.md), [context](../assets/scripts/context.md), [HTTP](../triggers/http.md), [schedules](../triggers/schedules.md), [repo-sync](../projects/repo-sync.md). Targeted source: `crates/viat-runtime/src/python.rs` (SQL transaction/execute and mail helper), `crates/viat-api/src/runner/broker.rs` (SQLite transaction opening), repo-sync serializers. Actual relay connectivity/TLS/provider acceptance, real broker faults, cron timing and published HTTP need separately approved integration checks. Unit tests cannot establish email delivery.
+See [SMTP](../assets/resources/smtp.md), [SQLite](../assets/resources/sqlite.md), [workflows](../assets/workflows/overview.md), [context](../assets/scripts/context.md), [HTTP](../triggers/http.md), [schedules](../triggers/schedules.md), [repo-sync](../projects/repo-sync.md). Actual relay connectivity/TLS/provider acceptance, real broker faults, cron timing and published HTTP need separately approved integration checks. Unit tests cannot establish email delivery.
+
+## Verification basis
+
+Targeted source: `crates/viat-runtime/src/python.rs` (SQL transaction/execute and mail helper), `crates/viat-api/src/runner/broker.rs` (SQLite transaction opening), repo-sync serializers.
