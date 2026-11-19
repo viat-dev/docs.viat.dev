@@ -69,7 +69,7 @@ outputs: [snapshots](../publishing/snapshots.md).
 | `proxy_resource_name` | Optional `http_api` resource; proxy mounts set no method. |
 | `proxy_strip_prefix` | Defaults to `true`. |
 | `proxy_upstreams` | Optional "path-parameter value → fully qualified http_api resource" map; the whole mounted path must have exactly one path parameter; unmapped values use the default upstream. |
-| `crud_resource_name`, `crud_config` | PostgreSQL CRUD binding, see [CRUD](crud.md). |
+| `crud_resource_name`, `crud_config` | Database CRUD binding (`postgresql`, `mysql` or `sqlite`), see [CRUD](crud.md). |
 | `ws_config` | Inbound WebSocket binding, see [WebSocket endpoints](websocket-endpoints.md). |
 | `allowed_authorizers` | Authorizer names; omitted/null inherits; the nearest declaration **replaces** ancestor lists — no accumulation. |
 | `authz_gates` | `{type,action}` list; omitted/null inherits; **accumulates** down the tree until `override_permissions` cuts it off. |

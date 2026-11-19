@@ -1,5 +1,5 @@
 ---
-title: "PostgreSQL CRUD 端点"
+title: "CRUD 端点"
 description: "用冻结 REST 契约和实时授权范围安全开放数据表。"
 doc_id: triggers.crud
 verified_release: '1.1.0'
@@ -7,14 +7,15 @@ channel: stable
 contract_ids: []
 ---
 
-# PostgreSQL CRUD 端点
+# CRUD 端点
 
-CRUD 是一种**原生端点目标**:不写脚本,直接把 PostgreSQL 表的增删改查
-暴露为受控 REST 路由。它不是生成脚本,也不是通用数据库浏览器。
+CRUD 是一种**原生端点目标**:不写脚本,直接把数据表的增删改查暴露为受控
+REST 路由。它不是生成脚本,也不是通用数据库浏览器。
 
 先记住四条:
 
-- 仅支持 **postgresql 资源**,使用 overlay 暴露的表/列名。
+- 支持 **`postgresql`、`mysql` 与 `sqlite` 资源**,使用 overlay 暴露的表/列名
+  (`sqlite` 适合单节点或复制只读文件,不适合多节点共享写)。
 - 每个叶子只做一种操作;沿用端点的 authorizer、gate、限速与日志。
 - 权限是双层的:创建/编辑需内容编辑权、发布需发布权;**调用者必须同时
   满足已发布路由权限与行级授权**。
@@ -43,11 +44,11 @@ Authorization: Bearer <console-token>
 
 | 操作 | 方法 | 路径要求 | 结果 |
 | --- | --- | --- | --- |
-| `list` | GET | 集合 | 所选列的行数组。 |
-| `get_by_pk` | GET | 每个主键列对应同名 `:column` | 单行或 404。 |
-| `insert` | POST | 集合 | 插入后的所选行。 |
-| `update_by_pk` | PATCH | 全部主键列 | 更新行或 404。 |
-| `delete_by_pk` | DELETE | 全部主键列 | 删除行或 404。 |
+| `list` | GET | 集合 | 200 所选列的行数组。 |
+| `get_by_pk` | GET | 每个主键列对应同名 `:column` | 200 单行或 404。 |
+| `insert` | POST | 集合 | 201 插入后的所选行。 |
+| `update_by_pk` | PATCH 或 PUT | 全部主键列 | 200 更新行或 404。 |
+| `delete_by_pk` | DELETE | 全部主键列 | 200 删除行或 404。 |
 
 列表成功 body 如 `[{"id":1,"title":"A guide"}]`;get/update/delete 返回
 单行对象,不是单元素数组。主键类型从 schema 冻结并在 dispatch 转换。
@@ -65,7 +66,7 @@ Authorization: Bearer <console-token>
 | `order_by` | `[]`;仅 list。固定 `{column,dir:"asc"\|"desc"}` 数组;调用者不能自选排序;未固定顺序时分页不稳定。 |
 | `limit` | 省略/null 用 `{default:50,max:200}`;调用者 limit 被夹到 max;`offset` 为偏移;没有"无限制"写法。 |
 | `writable` | `[]` = 所有映射的非主键列;显式列表缩小写入列;未知或不可写的 body 列被拒绝。省略字段**不会**自动置 null;SQL null 仍须满足表约束/schema。 |
-| `defaults` | `{}`;平台填充列 → `$identity`、`$principal`、`$user_id`、`$role`、`$authorizer`、`$project_id`、`$claim.<name>`;不得与 writable 重叠,调用者不能提交这些列;值无法解析时拒绝,**不写 null**。 |
+| `defaults` | `{}`;平台填充列 → `$identity`、`$principal`、`$user_id`、`$role`、`$authorizer`、`$project_id`、`$claim.<name>`、`$now`(RFC 3339 UTC 时间戳);不得与 writable 重叠,调用者不能提交这些列;值无法解析时拒绝,**不写 null**。 |
 | `authz_type` | 省略/null 继承资源表绑定;显式类型对 list/get 用 `read`、insert 用 `create`,另有 `update`、`delete`,对应 action 必须存在;继承的 authz_tables 可重映射 action。**无允许规则则看不到、也写不到行。** |
 | `allow_unscoped_writes` | 默认 false;变更操作必须有 authz_type 或资源 authz_tables 绑定,否则发布拒绝;true 是明确的全表逃生口,**不是**自动授权。 |
 

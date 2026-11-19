@@ -65,7 +65,7 @@ Content-Type: application/json
 | `proxy_resource_name` | 可选 `http_api` 资源名;代理挂载不能设置 method。 |
 | `proxy_strip_prefix` | 默认 `true`。 |
 | `proxy_upstreams` | 可选"路径参数值 → 完整 http_api 资源名"映射;整个挂载路径必须恰有一个路径参数,未映射值用默认上游。 |
-| `crud_resource_name`、`crud_config` | PostgreSQL CRUD 绑定,见 [CRUD](crud.md)。 |
+| `crud_resource_name`、`crud_config` | 数据库 CRUD 绑定(`postgresql`、`mysql` 或 `sqlite`),见 [CRUD](crud.md)。 |
 | `ws_config` | 入站 WebSocket 绑定,见 [WebSocket 端点](websocket-endpoints.md)。 |
 | `allowed_authorizers` | authorizer 名称列表;省略/null 继承;最近的声明**替换**祖先列表,不累加。 |
 | `authz_gates` | `{type,action}` 列表;省略/null 继承;沿树**累加**,直到 `override_permissions` 截断。 |

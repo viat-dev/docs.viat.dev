@@ -7,7 +7,7 @@ channel: preview
 contract_ids: []
 ---
 
-This unreleased extension builds on [CRUD endpoints](crud.md). Existing list endpoints keep their `limit` / `offset` inputs and array responses unless their published configuration explicitly enables page mode. This is not an automatic migration of script endpoints.
+This unreleased extension builds on [CRUD endpoints](crud.md). Existing list endpoints keep their `limit` / `offset` inputs and array responses unless their published configuration explicitly enables page mode. This is not an automatic migration of script endpoints. For the matching draft validation, OpenAPI, Console, CLI and MCP alignment, see [CRUD surface alignment (preview)](crud-surface-preview.md).
 
 ## Configuration
 

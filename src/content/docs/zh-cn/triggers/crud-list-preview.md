@@ -7,7 +7,7 @@ channel: preview
 contract_ids: []
 ---
 
-这是基于[CRUD端点](crud.md)的未发布扩展。已有列表继续接受 `limit` / `offset` 并返回数组，除非已发布配置明确启用page模式。这不是脚本端点的自动迁移。
+这是基于[CRUD端点](crud.md)的未发布扩展。已有列表继续接受 `limit` / `offset` 并返回数组，除非已发布配置明确启用page模式。这不是脚本端点的自动迁移。配套的草稿静态校验、OpenAPI、Console、CLI 与 MCP 对齐见[CRUD 表面与契约对齐（预览）](crud-surface-preview.md)。
 
 ## 配置
 

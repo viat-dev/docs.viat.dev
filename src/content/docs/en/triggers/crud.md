@@ -1,21 +1,23 @@
 ---
-title: "PostgreSQL CRUD endpoints"
-description: "Expose a table with a frozen REST contract and live authorization scope."
+title: "CRUD endpoints"
+description: "Expose a database table with a frozen REST contract and live authorization scope."
 doc_id: triggers.crud
 verified_release: '1.1.0'
 channel: stable
 contract_ids: []
 ---
 
-# PostgreSQL CRUD endpoints
+# CRUD endpoints
 
 CRUD is a **native endpoint target**: without writing a script, it exposes a
-PostgreSQL table's create/read/update/delete as controlled REST routes. It
-is not a generated script and not a generic database browser.
+database table's create/read/update/delete as controlled REST routes. It is
+not a generated script and not a generic database browser.
 
 Four things to internalize:
 
-- **postgresql resources only**, using post-overlay table/column names.
+- **`postgresql`, `mysql` and `sqlite` resources**, using post-overlay
+  table/column names (`sqlite` suits single-node or replicated read-only files,
+  not multi-node shared writes).
 - Each leaf performs exactly one operation, under ordinary endpoint
   authorizers, gates, rate limits and logging.
 - Permissions are two-layer: create/edit needs content-edit rights and
@@ -49,11 +51,11 @@ view and shared fields: [HTTP](http.md).
 
 | Operation | Method | Path requirement | Result |
 | --- | --- | --- | --- |
-| `list` | GET | collection | Array of rows with the chosen columns. |
-| `get_by_pk` | GET | one `:column` per primary-key column | One row or 404. |
-| `insert` | POST | collection | The inserted row, chosen columns. |
-| `update_by_pk` | PATCH | all primary-key columns | Updated row or 404. |
-| `delete_by_pk` | DELETE | all primary-key columns | Deleted row or 404. |
+| `list` | GET | collection | 200 array of rows with the chosen columns. |
+| `get_by_pk` | GET | one `:column` per primary-key column | 200 single row or 404. |
+| `insert` | POST | collection | 201 inserted row, chosen columns. |
+| `update_by_pk` | PATCH or PUT | all primary-key columns | 200 updated row or 404. |
+| `delete_by_pk` | DELETE | all primary-key columns | 200 deleted row or 404. |
 
 A successful list body looks like `[{"id":1,"title":"A guide"}]`;
 get/update/delete return a single row object, not a one-element array.
@@ -73,7 +75,7 @@ the rest default as follows.
 | `order_by` | `[]`; list only. A fixed `{column,dir:"asc"\|"desc"}` array; callers never choose ordering; without a fixed order, pagination is unstable. |
 | `limit` | Omitted/null uses `{default:50,max:200}`; caller limits clamp to max; `offset` paginates; there is no "unlimited" form. |
 | `writable` | `[]` = all mapped non-key columns; an explicit list narrows writes; unknown or non-writable body columns are rejected. Omitted fields are **not** auto-nulled; SQL nulls must still satisfy table constraints/schema. |
-| `defaults` | `{}`; platform-filled columns → `$identity`, `$principal`, `$user_id`, `$role`, `$authorizer`, `$project_id`, `$claim.<name>`; must not overlap `writable` and callers cannot submit them; unresolvable values are rejected and **null is never written**. |
+| `defaults` | `{}`; platform-filled columns → `$identity`, `$principal`, `$user_id`, `$role`, `$authorizer`, `$project_id`, `$claim.<name>`, `$now` (RFC 3339 UTC timestamp); must not overlap `writable` and callers cannot submit them; unresolvable values are rejected and **null is never written**. |
 | `authz_type` | Omitted/null inherits the resource's table binding; an explicit type maps list/get to `read` and insert to `create`, plus `update` and `delete`, whose actions must exist; inherited authz_tables can remap actions. **Without an allow rule, rows are neither visible nor writable.** |
 | `allow_unscoped_writes` | Default false; mutating operations need an authz_type or resource authz_tables binding or publishing refuses; true is a deliberate whole-table escape hatch, **not** automatic authorization. |
 
