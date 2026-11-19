@@ -9,7 +9,7 @@ contract_ids: []
 
 # CRUD 表面与契约对齐（预览）
 
-这是[CRUD 端点](crud.md)与[CRUD 分页列表](crud-list-preview.md)的未发布后续改进，将管理 API、OpenAPI 导出、Console 标签页、CLI 与 MCP 投影中的 CRUD 行为对齐到同一契约，并扩展了只读嵌套关联 `relations`、更多过滤操作符与跨关联过滤、命名排序预设 `order_presets`，以及统一的多表 `resource.authz_tables` 行级授权。需要包含提交 `ff5874a9` 的服务端、CLI 与 MCP 版本。`1.1.0` 稳定参考页基线保持不变。
+这是[CRUD 端点](crud.md)与[CRUD 分页列表](crud-list-preview.md)的后续改进，将管理 API、OpenAPI 导出、Console 标签页、CLI 与 MCP 投影中的 CRUD 行为对齐到同一契约，并扩展了只读嵌套关联 `relations`、更多过滤操作符与跨关联过滤、命名排序预设 `order_presets`，以及统一的多表 `resource.authz_tables` 行级授权。该能力随服务端、CLI 与 MCP `1.5.0` 版本（提交 `ceda3d8a`）发布。`1.1.0` 稳定参考页基线保持不变。
 
 > [!NOTE]
 > 任意动态 SQL、脱离 schema 关系定义的自定义 join、逐关联独立授权覆盖以及 CRUD `response_transform` 仍不支持。所有行级授权均统一由资源级 `authz_tables` 绑定（加根表可选 `authz_type` 覆盖）治理。
@@ -33,19 +33,19 @@ contract_ids: []
 
 ## 嵌套关联、过滤扩充与命名排序预设
 
-包含提交 `ff5874a9` 的版本新增以下能力：
+自 `1.5.0`（`ceda3d8a`）起提供以下能力：
 
 - **只读嵌套关联 `relations`**（`list` 与 `get_by_pk`）：按输出字段名映射到 `{relation?, columns?, order_by?, limit?, relations?}`（最大深度 `3`）。省略 `relation` 时直接按输出键匹配 schema 关系名，指定 `relation` 可为输出字段起别名。`Object` 关联拒绝 `order_by` 与 `limit`；`Array` 关联支持 `order_by` 与 `limit`（默认 `50`，上限 `200`）。
-- **统一的多表行级授权**：CRUD 与 `viat_gql` 脚本及 `ctx.resources.<db>.graphql(...)` 共享同一条 `authz_scope::bind_authz_policy` 路径。当资源配置了 `authz_tables`（或端点配置了根表 `authz_type`）时，凡是被 `relations` 或跨关联 `filters` 触达的关联表也必须在 `resource.authz_tables` 中绑定并具备 `read` action——否则发布直接拒绝（`400`），运行时根表与所有关联表统一按实时行范围策略过滤。
-- **过滤操作符与跨关联过滤**（`list`）：`filters.<name>.op` 在原有 `eq`、`neq`、`gt`、`gte`、`lt`、`lte`、`like`、`ilike` 基础上新增 `in`、`nin`、`is_null`、`contains`、`icontains`、`prefix`、`iprefix`、`suffix`、`isuffix`。`in`/`nin` 支持逗号分隔字符串（对非文本标量自动去除前后空白）、JSON 数组或单值（上限 `200` 项，拒绝 `null` 元素）。`is_null` 接受布尔值，且是唯一允许用于 `json`/`jsonb` 列的过滤操作符。可选 `filters.<name>.relation` 支持最多 3 层的点分关系路径，按关联表实时行范围执行跨表过滤。
-- **命名排序预设 `order_presets`**（`list`）：通过 `order_presets: {"<名称>": [{"column": "...", "dir": "asc"|"desc"}]}` 与可选 `order_param`（默认 `"order_by"`）暴露受控的排序选项；未传参数时回落到静态 `order_by`，传入未声明的预设名返回 `400 bad_request`。
+- **统一的多表行级授权**：CRUD 与 `viat_gql` 脚本及 `ctx.resources.<db>.graphql(...)` 共享同一条 `authz_scope::bind_authz_policy` 路径。当资源配置了 `authz_tables`（或端点配置了根表 `authz_type`）时，凡是被 `relations` 或跨关联 `filters` 触达的关联表也必须在 `resource.authz_tables` 中绑定并具备 `read` action——否则发布直接拒绝（`400`），运行时根表与所有关联表统一按实时行范围策略过滤（发布后动态移除关联表的 `authz_tables` 绑定会按 fail-closed 拒绝）。
+- **过滤操作符与跨关联过滤**（`list`）：`filters.<name>.op` 在原有 `eq`、`neq`、`gt`、`gte`、`lt`、`lte`、`like`、`ilike` 基础上新增 `in`、`nin`、`is_null`、`contains`、`icontains`、`prefix`、`iprefix`、`suffix`、`isuffix`。`in`/`nin` 支持逗号分隔字符串（对非文本标量自动去除前后空白）、JSON 数组或单值（上限 `200` 项；`null` 元素以及未启用 `skip_empty` 时的空列表 `""`/`[]` 均返回 `400`，启用 `skip_empty: true` 时同时忽略 `""` 与 `[]`）。`is_null` 接受布尔值，且是唯一允许用于 `json`/`jsonb` 列的过滤操作符。可选 `filters.<name>.relation` 支持最多 3 层的点分关系路径，按关联表实时行范围执行跨表过滤。
+- **命名排序预设 `order_presets`**（`list`）：通过 `order_presets: {"<名称>": [{"column": "...", "dir": "asc"|"desc"}]}` 与可选 `order_param`（默认 `"order_by"`）暴露受控的排序选项；未传参数时回落到静态 `order_by`，传入未声明的预设名返回 `400 bad_request`。当 `overrides.strict: true` 时，发布阶段会检查所有过滤器、`search.param` 与 `order_param` 是否在 `overrides.query_params` 中声明并输出告警，也会对非 `string` 类型 `query_params` 绑定 `skip_empty: true` 过滤器发出告警。
 
 ## OpenAPI 3.1 合成与执行预算
 
 `GET /projects/{slug}/openapi.json`（见[HTTP API 概览](../api/overview.md)）现在更准确地反映已发布 CRUD 快照契约：
 
 - **`insert` 状态码**：导出 `"201"`（`Created.`）而非 `"200"`，与运行时分发保持一致。
-- **主键路径参数**：在 `get_by_pk`、`update_by_pk`、`delete_by_pk` 上，若 `overrides.path_params` 未声明对应主键，则从冻结的 `resolved.pk` 自动合成 `in: "path", required: true` 参数；若已通过 `overrides.path_params` 的 `as` 声明了外部别名，则为该别名补充冻结的主键类型而不重复输出内部列名。
+- **路径参数**：在 `get_by_pk`、`update_by_pk`、`delete_by_pk` 上，若 `overrides.path_params` 未声明对应主键，则从冻结的 `resolved.pk` 自动合成 `in: "path", required: true` 参数（已通过 `as` 声明外部别名时补充类型而不重复输出内部列名）。对于挂载在带路径参数目录下的 `list`/`insert` 端点（如 `/orgs/:org_id/orders`），也会为未声明的 `:seg` 合成必填 `in: "path"` 参数并避免重复生成同名 `in: "query"` 参数。
 - **闭集写入请求体**：在 `insert` 与 `update_by_pk` 上，根据冻结的 `resolved.writable` 列合并 `overrides.body_fields`（遵循 `as` 别名与 `nullable`）以及 `overrides.audit_reason`（当配置为 `body.<field>` 时）合成 JSON 对象 schema，并始终输出 `additionalProperties: false`（即便 `writable` 为空）。
 - **扩展列表查询与嵌套关联响应**：为 `is_null` 过滤合成布尔 schema、为 `in`/`nin` 与跨关联过滤补充说明、为 `order_presets` 生成 `enum` 查询参数，并为递归嵌套关联生成响应 schema（`Object` 关联为 `["object", "null"]`，`Array` 关联为 `array`）。
 - **执行预算**：`GET /projects/{slug}/endpoints/{id}` 为 CRUD 端点填充 `execution_budget`，使用 `in_process` 通道（`always_async: false`），超时取项目 `default_timeout_secs` 或部署级同步脚本超时上限。
@@ -112,4 +112,4 @@ contract_ids: []
 
 ## 核验依据
 
-契约源码 `ff5874a9`：`crates/viat-core/src/types/{crud,snapshot}.rs`；`crates/viat-runtime/src/{authz_scope,crud}.rs`；`crates/viat-api/src/{crud_dispatch,openapi,handlers/endpoints,handlers/snapshots,runner/budget}.rs`；`crates/viat-mcp/src/tools/endpoints.rs`；`crates/viat-cli/src/{commands/endpoint,repo/diff}.rs`；`web/src/pages/endpoints/{crudContract.ts,NodeContractTab.tsx,NodeTestTab.tsx,NodeInfoTab.tsx,NodeAuthTab.tsx,NodeCacheTab.tsx,NodePublishTab.tsx,PublishHistoryDrawer.tsx}`。
+契约源码 `ceda3d8a`（`1.5.0`）：`crates/viat-core/src/types/{crud,snapshot}.rs`；`crates/viat-runtime/src/{authz_scope,crud}.rs`；`crates/viat-api/src/{crud_dispatch,openapi,handlers/endpoints,handlers/snapshots,runner/budget}.rs`；`crates/viat-mcp/src/tools/endpoints.rs`；`crates/viat-cli/src/{commands/endpoint,repo/diff}.rs`；`web/src/pages/endpoints/{crudContract.ts,NodeContractTab.tsx,NodeTestTab.tsx,NodeInfoTab.tsx,NodeAuthTab.tsx,NodeCacheTab.tsx,NodePublishTab.tsx,PublishHistoryDrawer.tsx}`。
