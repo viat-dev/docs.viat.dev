@@ -10,7 +10,7 @@
   "server": {
     "version": "1.1.0",
     "release_source": "fd340879076a87c2662c454788178eecb05d0036",
-    "inspected_main": "4219ede8308b972d91dd8b6007b0b52d1182ed66"
+    "inspected_main": "ff5874a940fb4ad0767e6007c0eb504a21e575ee"
   },
   "client": {
     "version": "0.1.0",
@@ -26,21 +26,21 @@
   ],
   "contract_bundle": {
     "directory": "contracts/1.4.1",
-    "source_sha": "4219ede8308b972d91dd8b6007b0b52d1182ed66",
+    "source_sha": "ff5874a940fb4ad0767e6007c0eb504a21e575ee",
     "source_dirty": false,
     "review_status": "candidate",
     "files": {
       "resources.json": {
-        "sha256": "5db324bc135e679ad80df1b45b052413c8f6895f1cf92d3c8c40ac1161b1abd7"
+        "sha256": "d6ebe4eec25aed4e7cbffbce89d55ebf552f156544673bbcd39321b6beec3fef"
       },
       "languages.json": {
-        "sha256": "ff7c98b9f70765971fefafe9cd1eff6277e29d2550d191fbce86934d79ac7399"
+        "sha256": "22ed7f7428c0a922bca809dfc7895f21a1a6804e27ac5b6929fbf0ca0a559e20"
       },
       "cli.json": {
-        "sha256": "2fa17dd52e7cfe85fa8f81a664de15117b8c15eef301a82433adb037f8a4a238"
+        "sha256": "04c5f8f9a10e656354178e531d8330d01e1e1979ea2335f9a731fde0a6a432ea"
       },
       "mcp-tools.json": {
-        "sha256": "f158d9e47f3641b955e22a90db156b7643353a5dcd69d2ba3406cb41bab31694"
+        "sha256": "372fab715cc8a0d031fdf7bc36afdead8e08a88789b269d756d7accf731e1c16"
       }
     }
   },

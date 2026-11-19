@@ -9,10 +9,10 @@ contract_ids: []
 
 # CRUD surface and contract alignment (preview)
 
-This unreleased follow-up to [CRUD endpoints](crud.md) and [paged CRUD lists](crud-list-preview.md) aligns CRUD behavior across the management API, OpenAPI export, Console tabs, CLI and MCP projections. It requires a server, CLI and MCP build containing commit `4219ede8`. Stable `1.1.0` reference pages remain unchanged.
+This unreleased follow-up to [CRUD endpoints](crud.md) and [paged CRUD lists](crud-list-preview.md) aligns CRUD behavior across the management API, OpenAPI export, Console tabs, CLI and MCP projections, and extends CRUD queries with read-only nested `relations`, expanded filter operators, cross-relation filtering, named `order_presets`, and unified multi-table `resource.authz_tables` row-level authorization. It requires a server, CLI and MCP build containing commit `ff5874a9`. Stable `1.1.0` reference pages remain unchanged.
 
 > [!NOTE]
-> These updates tighten validation and surface existing runtime semantics consistently; they do not add new query operators, dynamic `order_by`, relation joins or CRUD `response_transform` support.
+> Arbitrary dynamic SQL, custom joins outside declared schema relations, per-relation authorization overrides, and CRUD `response_transform` remain unsupported. All row-level authorization is governed uniformly by the resource's `authz_tables` bindings (plus optional root `authz_type` override).
 
 ## Draft-time static `crud_config` validation
 
@@ -21,13 +21,24 @@ This unreleased follow-up to [CRUD endpoints](crud.md) and [paged CRUD lists](cr
 | Rule | Rejected at draft save |
 | --- | --- |
 | `table` | Empty or whitespace-only table name. |
-| List-only options | Non-empty `filters`, non-empty `order_by`, explicit `limit`, `pagination`, or `search` on `get_by_pk`, `insert`, `update_by_pk` or `delete_by_pk`. |
+| List-only options | Non-empty `filters`, non-empty `order_by`, explicit `order_param`, non-empty `order_presets`, explicit `limit`, `pagination`, or `search` on `get_by_pk`, `insert`, `update_by_pk` or `delete_by_pk`. |
+| Read-only `relations` | Non-empty `relations` on `insert`, `update_by_pk` or `delete_by_pk`; invalid alias or relation identifiers; relation depth above 3; array relation `limit == 0` or `limit > 200`; alias colliding with root `columns`. |
 | `pagination: "page"` | Empty `order_by`, `limit.default == 0`, `limit.max == 0`, `limit.default > limit.max`, or `limit.max` outside signed 64-bit bounds. |
-| `filters` and `search.param` | Parameter names that are not valid GraphQL identifiers, duplicate or colliding `search.param` / filter names, or collisions with reserved pagination params (`limit`, `offset`, plus `page` and `page_size` in page mode). |
+| `filters`, `search.param` and `order_param` | Parameter names that are not valid GraphQL identifiers, invalid dotted `filters.<name>.relation` paths (depth > 3), duplicate or colliding names across `filters` / `search.param` / `order_param`, or collisions with reserved pagination params (`limit`, `offset`, plus `page` and `page_size` in page mode). |
+| `order_presets` | Preset names that are not valid identifiers, or presets with an empty `order_by` list. |
 | `search.columns` | Empty column list, blank column names or duplicate column entries. |
 | `writable` and `defaults` | Overlap between `writable` and `defaults`, or any `defaults` value outside `$identity`, `$principal`, `$user_id`, `$role`, `$authorizer`, `$project_id`, `$now`, and `$claim.<non-empty>`. |
 
-Publishing still performs full schema-aware checks (table existence, mapped columns, primary keys, text/varchar search column types, `<table>_aggregate` collisions and write row-scope policy) and re-runs the static validator as defense-in-depth for legacy rows saved by older servers.
+Publishing still performs full schema-aware checks (table existence, mapped columns, primary keys, relation traversal, object vs array relation options, text/varchar search and pattern column types, `<table>_aggregate` collisions, and multi-table `resource.authz_tables` coverage) and re-runs the static validator as defense-in-depth for legacy rows saved by older servers.
+
+## Nested relations, expanded filters and named order presets
+
+Available on builds containing commit `ff5874a9`:
+
+- **Read-only nested `relations`** (`list` and `get_by_pk`): map an output key to `{relation?, columns?, order_by?, limit?, relations?}` (max depth `3`). When `relation` is omitted, the map key names the schema relation; setting `relation` aliases the output field. `Object` relations reject `order_by` and `limit`; `Array` relations support `order_by` and `limit` (default `50`, max `200`).
+- **Unified multi-table row-level authorization**: CRUD executes through the same `authz_scope::bind_authz_policy` path as `viat_gql` scripts and `ctx.resources.<db>.graphql(...)`. When the resource binds `authz_tables` (or the endpoint sets `authz_type`), every related table reached by `relations` or cross-relation `filters` must also be bound in `resource.authz_tables` with a `read` action—otherwise publish is refused (`400`), and at runtime every root and nested table enforces its live row scope.
+- **Expanded filter operators and cross-relation filters** (`list`): `filters.<name>.op` now adds `in`, `nin`, `is_null`, `contains`, `icontains`, `prefix`, `iprefix`, `suffix`, and `isuffix` alongside `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `like`, `ilike`. `in`/`nin` accept comma-separated strings (trimming whitespace for non-string scalars), JSON arrays, or a single scalar (max `200` items; `null` items rejected). `is_null` expects a boolean and is the only filter operator permitted on `json`/`jsonb` columns. Optional `filters.<name>.relation` accepts a dotted schema relation path (max depth `3`) to filter on related rows under their live row scopes.
+- **Named `order_presets`** (`list`): declare `order_presets: {"<name>": [{"column": "...", "dir": "asc"|"desc"}]}` and optional `order_param` (default `"order_by"`). Omitting the query parameter falls back to static `order_by`; supplying an unknown preset name returns `400 bad_request`.
 
 ## OpenAPI 3.1 synthesis and execution budget
 
@@ -36,6 +47,7 @@ Publishing still performs full schema-aware checks (table existence, mapped colu
 - **`insert` status code**: emits `"201"` (`Created.`) instead of `"200"`, matching runtime dispatch.
 - **Primary-key path parameters**: on `get_by_pk`, `update_by_pk` and `delete_by_pk`, synthesizes `in: "path", required: true` parameters from the frozen `resolved.pk` columns whenever `overrides.path_params` leaves them undeclared. When `overrides.path_params` declares a wire alias (`as`), the alias entry is enriched with the frozen PK schema instead of emitting a duplicate internal column name.
 - **Closed-set write bodies**: on `insert` and `update_by_pk`, builds the JSON object request body schema from the frozen `resolved.writable` columns merged with `overrides.body_fields` (respecting `as` aliases and `nullable`) plus `overrides.audit_reason` when configured as `body.<field>`. `additionalProperties` is always `false`, including when `writable` is empty.
+- **Expanded list queries and nested relation responses**: synthesizes boolean schemas for `is_null` filters, list descriptions for `in`/`nin` and cross-relation filters, `enum` query parameters for `order_presets`, and recursive response object schemas where `Object` relations emit `["object", "null"]` and `Array` relations emit `array`.
 - **Execution budget**: `GET /projects/{slug}/endpoints/{id}` populates `execution_budget` on the `in_process` lane (`always_async: false`) using the project's `default_timeout_secs` or the deployment synchronous script timeout ceiling.
 
 Source-derived OpenAPI fragment for a published `insert` endpoint (`books`, writable `["title"]`):
@@ -100,4 +112,4 @@ Existing legacy rows in the database are not modified automatically; re-save or 
 
 ## Verification basis
 
-Contract source `4219ede8`: `crates/viat-core/src/types/{crud,snapshot}.rs`; `crates/viat-runtime/src/crud.rs`; `crates/viat-api/src/{openapi.rs,handlers/endpoints.rs,runner/budget.rs}`; `crates/viat-mcp/src/tools/endpoints.rs`; `crates/viat-cli/src/{commands/endpoint.rs,repo/diff.rs}`; `web/src/pages/endpoints/{crudContract.ts,NodeContractTab.tsx,NodeTestTab.tsx,NodeInfoTab.tsx,NodeAuthTab.tsx,NodeCacheTab.tsx,NodePublishTab.tsx,PublishHistoryDrawer.tsx}`.
+Contract source `ff5874a9`: `crates/viat-core/src/types/{crud,snapshot}.rs`; `crates/viat-runtime/src/{authz_scope,crud}.rs`; `crates/viat-api/src/{crud_dispatch,openapi,handlers/endpoints,handlers/snapshots,runner/budget}.rs`; `crates/viat-mcp/src/tools/endpoints.rs`; `crates/viat-cli/src/{commands/endpoint,repo/diff}.rs`; `web/src/pages/endpoints/{crudContract.ts,NodeContractTab.tsx,NodeTestTab.tsx,NodeInfoTab.tsx,NodeAuthTab.tsx,NodeCacheTab.tsx,NodePublishTab.tsx,PublishHistoryDrawer.tsx}`.
