@@ -95,9 +95,10 @@ DTO 结构允许每资源恰选 cassette/secret/testdb/storage/config 之一,但
 > **端点 config override 在运行时明确被拒绝**——测试使用已发布的 config
 > 资源本身。不能因为 DTO 里有这个字段,就声称 `{config:{…}}` 可用。
 > storage 可选 `root`(缺省用临时目录)、`prefix` 默认空、`max_file_bytes`
-> 为 0、`allowed_types` 为空;secret fake 就是一个字符串。fake 也不证明所有
-> 原生资源/目标(proxy/CRUD/auth/files)都被同样拦截——验证实际路径,使用
-> 隔离地址。
+> 为 0、`allowed_types` 为空;secret fake 就是一个字符串。在 `1.1.0` 基线中，fake
+> 不保证所有原生资源/目标(proxy/CRUD/auth/files)都被同样拦截——`1.6.0` 起 CRUD 与
+> `viat_gql` 的离线 `testdb` 拦截见[CRUD 表面与契约对齐（预览）](../triggers/crud-surface-preview.md)，
+> 其余路径仍应验证实际行为并使用隔离地址。
 
 ## 隔离、失败与清理
 

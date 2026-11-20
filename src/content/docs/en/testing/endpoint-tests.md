@@ -107,9 +107,11 @@ resource, but:
 > does not make `{config:{…}}` usable. Storage takes an optional `root`
 > (default: a temporary directory), `prefix` defaulting empty,
 > `max_file_bytes` 0 and `allowed_types` empty; a secret fake is just a
-> string. Fakes also do not prove every native resource/target
-> (proxy/CRUD/auth/files) is intercepted the same way — verify the actual
-> path and use isolated addresses.
+> string. In the `1.1.0` baseline, fakes do not guarantee every native
+> resource/target (proxy/CRUD/auth/files) is intercepted the same way — for
+> `1.6.0` offline `testdb` support on CRUD and `viat_gql` targets, see
+> [CRUD surface and contract alignment (preview)](../triggers/crud-surface-preview.md);
+> verify other paths directly and always use isolated addresses.
 
 ## Isolation, failures, cleanup
 

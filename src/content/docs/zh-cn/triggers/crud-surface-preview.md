@@ -9,7 +9,7 @@ contract_ids: []
 
 # CRUD 表面与契约对齐（预览）
 
-这是[CRUD 端点](crud.md)与[CRUD 分页列表](crud-list-preview.md)的后续改进，将管理 API、OpenAPI 导出、Console 标签页、CLI 与 MCP 投影中的 CRUD 行为对齐到同一契约，并扩展了只读嵌套关联 `relations`、更多过滤操作符与跨关联过滤、命名排序预设 `order_presets`，以及统一的多表 `resource.authz_tables` 行级授权。该能力随服务端、CLI 与 MCP `1.5.0` 版本（提交 `ceda3d8a`）发布。`1.1.0` 稳定参考页基线保持不变。
+这是[CRUD 端点](crud.md)与[CRUD 分页列表](crud-list-preview.md)的后续改进，将管理 API、OpenAPI 导出、Console 标签页、CLI 与 MCP 投影中的 CRUD 行为对齐到同一契约，并扩展了只读嵌套关联 `relations`、更多过滤操作符与跨关联过滤、命名排序预设 `order_presets`、统一的多表 `resource.authz_tables` 行级授权、数据库完整性约束 4xx 映射、服务端固定过滤 `fixed_filters`、`viat endpoint test` 离线 CRUD/`viat_gql` 支持，以及不停服草稿目标重绑。该能力随服务端、CLI 与 MCP `1.5.0`（`ceda3d8a`）与 `1.6.0`（`a193744f`）版本发布。`1.1.0` 稳定参考页基线保持不变。
 
 > [!NOTE]
 > 任意动态 SQL、脱离 schema 关系定义的自定义 join、逐关联独立授权覆盖以及 CRUD `response_transform` 仍不支持。所有行级授权均统一由资源级 `authz_tables` 绑定（加根表可选 `authz_type` 覆盖）治理。
@@ -27,9 +27,28 @@ contract_ids: []
 | `filters`、`search.param` 与 `order_param` | 参数名不是合法 GraphQL 标识符、`filters.<name>.relation` 点分路径非法或超过 3 层、`filters` / `search.param` / `order_param` 之间重名，或与保留分页参数冲突（`limit`、`offset`，以及 page 模式下的 `page`、`page_size`）。 |
 | `order_presets` | 预设名不是合法标识符，或预设的 `order_by` 列表为空。 |
 | `search.columns` | 列列表为空、含空白列名或存在重复列。 |
+| `fixed_filters` | 在 `insert`、`update_by_pk` 或 `delete_by_pk` 上设置非空 `fixed_filters`；空列名、非法 `relation` 点分路径（深度 > 3）、`is_null` 值不是布尔、`in`/`nin` 值为非数组、空数组、超过 `200` 项或含 `null` 元素，或文本模式操作符值不是字符串。 |
 | `writable` 与 `defaults` | `writable` 与 `defaults` 存在重叠列，或 `defaults` 值不属于 `$identity`、`$principal`、`$user_id`、`$role`、`$authorizer`、`$project_id`、`$now`、`$claim.<非空名称>`。 |
 
-发布时仍执行完整的 schema 感知校验（表是否存在、映射列、主键、关系路径遍历、对象与数组关联选项、text/varchar 搜索与模式匹配列类型、`<table>_aggregate` 冲突以及多表 `resource.authz_tables` 覆盖），并再次运行静态校验作为旧版本遗留草稿行的纵深防御。
+发布时仍执行完整的 schema 感知校验（表是否存在、映射列、主键、关系路径遍历、对象与数组关联选项、text/varchar 搜索与模式匹配列类型、`fixed_filters` 字面量按列类型与范围强校验、`<table>_aggregate` 冲突以及多表 `resource.authz_tables` 覆盖），并再次运行静态校验作为旧版本遗留草稿行的纵深防御。
+
+## `1.6.0` 强化：约束错误 4xx、固定过滤、离线 `testdb` 与不停服重绑
+
+自 `1.6.0`（`a193744f`，同步 `viat-gql 1.0.2`）起新增以下能力：
+
+- **数据库完整性约束映射为 4xx**：CRUD 与 `viat_gql` 写入触犯数据库完整性约束时不再返回裸 `500`，而是按 `sqlx::error::ErrorKind` 统一跨 PostgreSQL / MySQL / SQLite 映射为脱敏的客户端错误，同时完整数据库错误继续记录到执行日志：
+  - `UniqueViolation` / `ExclusionViolation` / `ForeignKeyViolation` → `409 conflict`
+  - `NotNullViolation` / `CheckViolation` → `400 bad_request`
+- **服务端固定过滤 `fixed_filters`**（`list` 与 `get_by_pk`）：配置数组 `[{"column": "...", "op"?: "eq", "value": ..., "relation"?: "..."}]`，不接受调用方入参，也无法被查询参数覆盖（典型场景：软删除 `deleted_at is_null: true` 或固定 `status` 子集）。发布阶段按实际列类型校验并归一化字面量（含 `float4` 溢出校验、任意精度 `numeric` 语法校验，以及跨关联 `relation` 对应的 `authz_tables` 覆盖校验）；运行时以独立 `$ff_N` 变量通过 `AND` 注入列表查询、总数聚合查询及 `get_by_pk` 主键查询（不匹配固定过滤的行返回 `404`）。
+- **`viat endpoint test` 离线 CRUD 与 `viat_gql` 支持**（见[端点契约测试](../testing/endpoint-tests.md)）：
+  - `viat-endpoint-test-host` 启动时预扫描 fixture 中声明的 `resources.<name>.testdb`，在离线 scratch 发布阶段直接连向该 `testdb` 完成 CRUD 表结构内省，同时保留资源的 `graphql_overlay` 与 `authz_tables`。
+  - 离线 host 的 `PoolRegistry` 默认 fail-closed：未声明 `testdb` 的数据库或非 `ViatGql` 池一律拒绝拨号，绝不触碰生产主机。
+  - CLI 播种 scratch host 时以合成占位替换 `$secret`/`$keep` 并剥离 `plain.audit`，避免带秘钥或审计配置的生产 Postgres 资源被跳过；CRUD 与 `viat_gql` 写入均运行于每个 fixture 独立的 `SAVEPOINT` 回滚事务内，且 `viat_gql` 脚本与 CRUD 一致按 scratch 库中已播种的项目 `authz` 模型评估行级授权。
+- **不停服草稿目标重绑**：`PUT /projects/{slug}/endpoints/{id}/info` 新增三态字段 `crud_resource_name`（省略=不变，`null`=显式清除 CRUD 绑定，字符串=绑定/切换 CRUD 资源），允许在**不修改活动 `published_snapshot_id`**的前提下于草稿态完成 `script`/`workflow` ↔ `crud` 转换或切换 CRUD 数据库资源，待 `publish apply` 时原子切换并可正常回滚（`proxy`、`auth`、`websocket` 叶节点仍拒绝重绑）。
+  - **CLI 同步**：`viat push` 默认仍拒绝静默切换端点目标种类或 CRUD 资源；显式传入 `--allow-rebind` 后，通过单次 `PUT /info` 完成草稿重绑（见[CLI sync](../cli/sync.md)）。
+  - **CLI 端点管理**：`viat endpoint update-info` 新增 `--workflow`、`--clear-workflow`、`--crud-resource`、`--clear-crud` 与 `--crud-config` 参数（见[CLI endpoint](../cli/endpoint.md)）。
+  - **MCP 工具**：`update_endpoint_info` 新增 `crud_resource_name` 与 `clear_crud_binding` 参数，支持通过 MCP 完成草稿重绑（见[MCP update_endpoint_info](../mcp/update_endpoint_info.md)）。
+- **`viat-gql 1.0.2` 同步**：包含写后行级作用域守卫 `NULL` 语义修复、MySQL 作用域 upsert 明确返回 `Unsupported`、MySQL `DELETE FOR UPDATE` 加锁修正以及解析器/校验器加固与性能优化。
 
 ## 嵌套关联、过滤扩充与命名排序预设
 
@@ -112,4 +131,4 @@ contract_ids: []
 
 ## 核验依据
 
-契约源码 `ceda3d8a`（`1.5.0`）：`crates/viat-core/src/types/{crud,snapshot}.rs`；`crates/viat-runtime/src/{authz_scope,crud}.rs`；`crates/viat-api/src/{crud_dispatch,openapi,handlers/endpoints,handlers/snapshots,runner/budget}.rs`；`crates/viat-mcp/src/tools/endpoints.rs`；`crates/viat-cli/src/{commands/endpoint,repo/diff}.rs`；`web/src/pages/endpoints/{crudContract.ts,NodeContractTab.tsx,NodeTestTab.tsx,NodeInfoTab.tsx,NodeAuthTab.tsx,NodeCacheTab.tsx,NodePublishTab.tsx,PublishHistoryDrawer.tsx}`。
+契约源码 `a193744f`（`1.6.0`，基于 `1.5.0` `ceda3d8a`）：`Cargo.toml`（`viat-gql 1.0.2`）；`crates/viat-core/src/types/{crud,snapshot}.rs`；`crates/viat-db/src/endpoints.rs`；`crates/viat-runtime/src/{authz_scope,crud,resource_io,resource_pool,testing,viat_gql_runtime}.rs`；`crates/viat-api/src/{crud_dispatch,dto,endpoint_test,openapi,bin/viat-endpoint-test-host,handlers/dispatch,handlers/endpoints,handlers/snapshots,runner/broker,runner/budget,runner/mod}.rs`；`crates/viat-mcp/src/tools/{endpoints,service}.rs`；`crates/viat-cli/src/{main,commands/endpoint,commands/endpoint_test,commands/sync,repo/diff,repo/endpoints,repo/resources}.rs`；`web/src/api/{endpoints.ts,generated/CrudConfig.ts,generated/CrudFixedFilter.ts}`；`web/src/pages/endpoints/{crudContract.ts,NodeContractTab.tsx,NodeTestTab.tsx,NodeInfoTab.tsx,NodeAuthTab.tsx,NodeCacheTab.tsx,NodePublishTab.tsx,PublishHistoryDrawer.tsx}`。
